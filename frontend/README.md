@@ -9,7 +9,7 @@ generates 4.5-year nodule progression projections.
 ## Project Structure
 
 ```
-lung-twin-app/          ← React + Vite frontend
+frontend/          ← React + Vite frontend
   src/
     pages/
       Dashboard.jsx     ← Home with stats + recent scans
@@ -23,7 +23,7 @@ lung-twin-app/          ← React + Vite frontend
     lib/
       api.js            ← API service (demo mode + real backend)
 
-lung-twin-backend/      ← FastAPI Python backend
+backend/      ← FastAPI Python backend
   server.py             ← API routes + digital twin pipeline
   requirements.txt
 ```
@@ -36,7 +36,7 @@ The frontend runs entirely standalone with simulated model outputs.
 No Python backend required to explore the UI.
 
 ```bash
-cd lung-twin-app
+cd frontend
 npm install
 npm run dev
 # Open http://localhost:5173
@@ -49,19 +49,10 @@ and the full demo pipeline runs in the browser.
 
 ## Full Stack Setup (with real model)
 
-### Step 1 — Train the model in Colab
-
-Run the `lung_digital_twin_masks.ipynb` notebook. At the end it saves:
-```
-/content/outputs/cnn3d_lung.pt
-```
-
-Download that file to your machine.
-
-### Step 2 — Backend setup
+### Step 1 — Backend setup
 
 ```bash
-cd lung-twin-backend
+cd backend
 mkdir -p models
 cp /path/to/cnn3d_lung.pt models/
 
@@ -75,12 +66,12 @@ python server.py
 # Docs at       http://localhost:8000/docs
 ```
 
-### Step 3 — Frontend with real backend
+### Step 2 — Frontend with real backend
 
 The frontend proxies `/api/*` to `http://localhost:8000` via vite.config.js.
 
 ```bash
-cd lung-twin-app
+cd frontend
 npm install
 npm run dev
 ```
