@@ -1,0 +1,11 @@
+fastapi==0.110.0
+uvicorn[standard]==0.29.0
+python-multipart==0.0.9
+SimpleITK==2.5.3
+scikit-image==0.22.0
+scipy==1.12.0
+trimesh==4.1.4
+numpy==1.26.4
+torch==2.1.0
+torchvision==0.16.0
+torch-geometric==2.5.0
