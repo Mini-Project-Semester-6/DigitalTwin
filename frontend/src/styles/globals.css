@@ -1,0 +1,91 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --deep:     #050b14;
+  --panel:    #0a1628;
+  --card:     #0f1f35;
+  --rim:      #1a3050;
+  --cyan:     #00d4e8;
+  --teal:     #00b89f;
+  --coral:    #ff5c5c;
+  --amber:    #f5a623;
+  --lavender: #9b8aff;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body, #root {
+  height: 100%;
+  background: var(--deep);
+  color: #e2eaf4;
+  font-family: 'DM Sans', system-ui;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--panel); }
+::-webkit-scrollbar-thumb { background: var(--rim); border-radius: 3px; }
+
+/* Scan line overlay on deep bg */
+body::before {
+  content: '';
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 212, 232, 0.012) 2px,
+    rgba(0, 212, 232, 0.012) 4px
+  );
+  z-index: 0;
+}
+
+/* Glow utilities */
+.glow-cyan  { text-shadow: 0 0 12px rgba(0,212,232,.6); }
+.glow-teal  { text-shadow: 0 0 12px rgba(0,184,159,.6); }
+.glow-coral { text-shadow: 0 0 12px rgba(255,92,92,.6); }
+
+/* Ring glow for cards */
+.ring-glow-cyan  { box-shadow: 0 0 0 1px rgba(0,212,232,.4), 0 0 24px rgba(0,212,232,.08); }
+.ring-glow-teal  { box-shadow: 0 0 0 1px rgba(0,184,159,.4), 0 0 24px rgba(0,184,159,.08); }
+.ring-glow-coral { box-shadow: 0 0 0 1px rgba(255,92,92,.4), 0 0 24px rgba(255,92,92,.08); }
+
+/* Pulse dot */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1);   }
+  50%       { opacity: .4; transform: scale(.8); }
+}
+.pulse-dot { animation: pulse-dot 1.6s ease-in-out infinite; }
+
+/* Progress bar fill */
+@keyframes bar-fill {
+  from { width: 0; }
+}
+.bar-animate { animation: bar-fill .9s cubic-bezier(.22,1,.36,1) forwards; }
+
+/* CT scan flicker entrance */
+@keyframes ct-flicker {
+  0%   { opacity: 0; filter: brightness(3); }
+  20%  { opacity: .7; filter: brightness(.6); }
+  40%  { opacity: .9; filter: brightness(1.2); }
+  100% { opacity: 1;  filter: brightness(1); }
+}
+.ct-flicker { animation: ct-flicker .5s ease-out forwards; }
+
+/* Slide-in from bottom */
+@keyframes slide-up {
+  from { transform: translateY(20px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+.slide-up { animation: slide-up .5s cubic-bezier(.22,1,.36,1) both; }
+
+.delay-100 { animation-delay: .1s; }
+.delay-200 { animation-delay: .2s; }
+.delay-300 { animation-delay: .3s; }
+.delay-400 { animation-delay: .4s; }
+.delay-500 { animation-delay: .5s; }

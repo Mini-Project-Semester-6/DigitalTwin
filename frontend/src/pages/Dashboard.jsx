@@ -1,151 +1,158 @@
-import { useNavigate } from 'react-router-dom'
-import { Upload, Activity, TrendingUp, AlertTriangle, CheckCircle, ChevronRight } from 'lucide-react'
-import { useState, useEffect } from 'react'
-import api from '../lib/api'
+import { Link } from 'react-router-dom'
+import { Scan, Layers, GitBranch, Cpu, ArrowRight } from 'lucide-react'
+
+const FEATURES = [
+  {
+    Icon: Scan,
+    title: '2.5D CNN Encoder',
+    body: 'EfficientNet-B0 backbone processes stacked CT slices in a tri-channel tensor, extracting rich spatial features from lung parenchyma.',
+    accent: 'var(--cyan)',
+  },
+  {
+    Icon: Layers,
+    title: '3-D Mesh Reconstruction',
+    body: 'Geometric features are derived from volumetric segmentation to approximate Marching Cubes mesh statistics including HD95 and surface-to-volume ratio.',
+    accent: 'var(--lavender)',
+  },
+  {
+    Icon: GitBranch,
+    title: 'Temporal LSTM',
+    body: '3-layer LSTM with multi-head self-attention simulates disease trajectory, projecting future severity states from the patient latent embedding.',
+    accent: 'var(--amber)',
+  },
+  {
+    Icon: Cpu,
+    title: 'Digital Twin State',
+    body: 'A 256-dimensional latent space encodes each patient as a unique digital representation, enabling CT slice reconstruction via the decoder.',
+    accent: 'var(--teal)',
+  },
+]
+
+const PIPELINE = [
+  'CT Scan (PNG slices)',
+  '2.5D CNN Encoder',
+  '3D Reconstruction',
+  'Latent Embedding',
+  'Digital Twin Latent',
+  'Temporal LSTM',
+  'Predictions & Projections',
+]
 
 export default function Dashboard() {
-  const navigate  = useNavigate()
-  const [analyses, setAnalyses] = useState({})
-
-  useEffect(() => {
-    setAnalyses(api.getAllAnalyses())
-  }, [])
-
-  const all    = Object.values(analyses)
-  const high   = all.filter(a => a.prediction?.risk_level === 'HIGH').length
-  const medium = all.filter(a => a.prediction?.risk_level === 'MEDIUM').length
-  const low    = all.filter(a => a.prediction?.risk_level === 'LOW').length
-  const recent = all.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 5)
-
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
+    <div className="max-w-5xl mx-auto px-6 py-12 space-y-16">
 
       {/* Hero */}
-      <div className="panel corner-accent p-8 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-5"
+      <section className="text-center space-y-6">
+        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-mono"
           style={{
-            backgroundImage: 'radial-gradient(circle at 70% 50%, var(--accent) 0%, transparent 60%)',
-          }} />
-        <div className="relative z-10">
-          <div className="label-tag mb-2">Digital Twin Platform</div>
-          <h1 className="font-display text-4xl font-bold text-black mb-2">
-            Lung CT Analysis<br />
-            <span className="text-accent text-glow">Digital Twin</span>
-          </h1>
-          <p className="text-dim text-sm max-w-lg mt-3 leading-relaxed">
-            Upload CT scan masks to generate a 3D digital twin. The model extracts
-            16 geometric features, runs a 3D CNN (FP16) and GNN classifier, then
-            projects nodule progression over 4.5 years.
-          </p>
-          <div className="flex gap-3 mt-6">
-            <button onClick={() => navigate('/upload')} className="btn-neon">
-              <span>+ Upload New Scan</span>
-            </button>
-            {all.length > 0 && (
-              <button onClick={() => navigate('/history')} className="btn-neon" style={{ borderColor: 'var(--dim)', color: 'var(--dim)' }}>
-                <span>View History</span>
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Stats row */}
-      <div className="grid grid-cols-4 gap-4">
-        {[
-          { label: 'Total Scans',   value: all.length,  color: 'var(--accent)', icon: Activity },
-          { label: 'High Risk',     value: high,         color: 'var(--pulse)',  icon: AlertTriangle },
-          { label: 'Medium Risk',   value: medium,       color: 'var(--warn)',   icon: TrendingUp },
-          { label: 'Low Risk',      value: low,          color: 'var(--safe)',   icon: CheckCircle },
-        ].map(({ label, value, color, icon: Icon }) => (
-          <div key={label} className="panel p-5 corner-accent group hover:border-opacity-60 transition-all">
-            <div className="flex items-start justify-between mb-3">
-              <span className="label-tag">{label}</span>
-              <Icon size={14} style={{ color }} />
-            </div>
-            <div className="font-display text-4xl font-bold" style={{ color }}>
-              {value}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Pipeline overview */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="panel p-6">
-          <div className="label-tag mb-4">Model Pipeline</div>
-          <div className="space-y-3">
-            {[
-              { step: '01', name: 'Load & Resample',   detail: 'MHD → 2mm isotropic binary mask' },
-              { step: '02', name: 'Marching Cubes',    detail: '3D mesh reconstruction from mask' },
-              { step: '03', name: 'Geometric Features', detail: '16 shape descriptors (volume, sphericity…)' },
-              { step: '04', name: '3D CNN Patches',    detail: '32³ patches · FP16 · Tiny3DCNN' },
-              { step: '05', name: 'GNN Classifier',    detail: 'k-NN graph (k=5) · 2-layer GCN' },
-              { step: '06', name: 'Feature Fusion',    detail: 'Geometric + CNN → Risk score' },
-            ].map(({ step, name, detail }) => (
-              <div key={step} className="flex items-start gap-3">
-                <span className="mono text-xs" style={{ color: 'var(--accent)', minWidth: '1.8rem' }}>{step}</span>
-                <div>
-                  <div className="text-sm text-black font-medium">{name}</div>
-                  <div className="label-tag mt-0.5">{detail}</div>
-                </div>
-              </div>
-            ))}
-          </div>
+            background: 'rgba(0,212,232,0.1)', border: '1px solid rgba(0,212,232,0.3)',
+            color: 'var(--cyan)'
+          }}>
+          <span className="pulse-dot w-1.5 h-1.5 rounded-full bg-teal-400 inline-block" />
+          Lung Digital Twin · COVID-19 AI
         </div>
 
-        <div className="panel p-6">
-          <div className="label-tag mb-4">Recent Analyses</div>
-          {recent.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center gap-3 py-10">
-              <div className="w-12 h-12 border border-dashed border-dim flex items-center justify-center">
-                <Upload size={20} className="text-dim" />
+        <h1 className="font-display font-700 text-5xl leading-tight tracking-tight">
+          Predict. Reconstruct.{' '}
+          <span className="glow-cyan" style={{ color: 'var(--cyan)' }}>Simulate.</span>
+        </h1>
+
+        <p className="text-lg opacity-60 max-w-xl mx-auto leading-relaxed">
+          Upload CT scan slices and let the digital twin classify COVID-19 variants,
+          score severity, reconstruct 3-D lung geometry, and project future disease states.
+        </p>
+
+        <Link to="/analyze"
+          className="inline-flex items-center gap-2 px-8 py-3 rounded-xl font-display font-600 text-sm transition-all duration-200"
+          style={{ background: 'var(--cyan)', color: 'var(--deep)' }}
+          onMouseEnter={e => e.currentTarget.style.boxShadow = '0 0 24px rgba(0,212,232,0.4)'}
+          onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}>
+          Start Analysis
+          <ArrowRight size={16} />
+        </Link>
+      </section>
+
+      {/* Pipeline */}
+      <section className="space-y-4">
+        <h2 className="font-display font-600 text-lg opacity-70">Model Pipeline</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          {PIPELINE.map((step, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <div className="px-4 py-2 rounded-xl text-sm font-mono"
+                style={{
+                  background: 'var(--card)', border: '1px solid var(--rim)',
+                  color: 'var(--cyan)'
+                }}>
+                {step}
               </div>
-              <p className="text-dim text-sm text-center">No scans analysed yet.<br />Upload a CT scan to begin.</p>
-              <button onClick={() => navigate('/upload')} className="btn-neon mt-2">
-                <span>Upload First Scan</span>
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {recent.map(a => (
-                <div
-                  key={a.scanId}
-                  onClick={() => navigate(`/analysis/${a.scanId}`)}
-                  className="flex items-center justify-between p-3 rounded cursor-pointer hover:bg-white/5 transition-colors group"
-                  style={{ border: '1px solid var(--border)' }}
-                >
-                  <div className="flex items-center gap-3">
-                    <RiskDot level={a.prediction?.risk_level} />
-                    <div>
-                      <div className="text-sm text-black truncate max-w-[180px]">
-                        {a.fileName}
-                      </div>
-                      <div className="label-tag">
-                        {new Date(a.timestamp).toLocaleDateString()} · {a.prediction?.risk_level}
-                      </div>
-                    </div>
-                  </div>
-                  <ChevronRight size={14} className="text-dim group-hover:text-accent transition-colors" />
-                </div>
-              ))}
-              {all.length > 5 && (
-                <button onClick={() => navigate('/history')}
-                  className="w-full text-center label-tag hover:text-accent transition-colors py-2">
-                  View all {all.length} scans →
-                </button>
+              {i < PIPELINE.length - 1 && (
+                <ArrowRight size={14} className="opacity-30" />
               )}
             </div>
-          )}
+          ))}
         </div>
-      </div>
-    </div>
-  )
-}
+      </section>
 
-function RiskDot({ level }) {
-  const color = level === 'HIGH' ? 'var(--pulse)' : level === 'MEDIUM' ? 'var(--warn)' : 'var(--safe)'
-  return (
-    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color, boxShadow: `0 0 6px ${color}` }} />
+      {/* Features */}
+      <section className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {FEATURES.map(({ Icon, title, body, accent }) => (
+          <div key={title} className="p-6 rounded-2xl space-y-3 transition-all duration-300"
+            style={{ background: 'var(--card)', border: '1px solid var(--rim)' }}
+            onMouseEnter={e => e.currentTarget.style.boxShadow = `0 0 24px ${accent}18`}
+            onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}>
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl" style={{ background: `${accent}18` }}>
+                <Icon size={18} style={{ color: accent }} />
+              </div>
+              <h3 className="font-display font-600 text-base">{title}</h3>
+            </div>
+            <p className="text-sm leading-relaxed opacity-55">{body}</p>
+          </div>
+        ))}
+      </section>
+
+      {/* Outputs */}
+      <section className="rounded-2xl p-8 space-y-5"
+        style={{ background: 'var(--card)', border: '1px solid var(--rim)' }}>
+        <h2 className="font-display font-600 text-lg">Model Outputs</h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          {[
+            // ['Variant', 'COVID-Negative / COVID-Positive', 'var(--teal)'],
+            // ['Severity', 'Continuous [0, 1] score', 'var(--coral)'],
+            // ['Confidence', 'Epistemic uncertainty', 'var(--lavender)'],
+            // ['3D Mesh', 'Vol · Surface · HD95', 'var(--cyan)'],
+            // ['CT Recon', '64×64 latent reconstruction', 'var(--amber)'],
+            // ['Progression', '7-step future simulation', 'var(--cyan)'],
+            ['COVID Variant', 'COVID-Neg / COVID-Pos', 'var(--teal)'],
+            ['Severity', 'Continuous [0,1] score', 'var(--coral)'],
+            ['CT Reconstruction', '64×64 latent reconstruction', 'var(--amber)'],
+            // Cancer
+            ['Cancer Type', 'Adeno / SCC / SCLC / Normal', 'var(--cyan)'],
+            ['Tumour Severity', 'Regression score', 'var(--lavender)'],
+            // Fibrosis
+            ['FVC', 'Forced vital capacity (mL)', 'var(--teal)'],
+            ['95% CI', 'Prediction interval', 'var(--lavender)'],
+            ['Fibrosis Stage', 'Mild / Moderate / Severe', 'var(--coral)'],
+            ['Risk Score', 'AUC-ROC-based [0,1]', 'var(--amber)'],
+            // Nodule Detection section
+            ['Nodule Label', 'Benign / Malignant', 'var(--teal)'],
+            ['Seg MIP', '128³ U-Net probability map', 'var(--cyan)'],
+            ['Candidates', 'Centroid · volume · peak prob', 'var(--lavender)'],
+            ['Growth Trajectory', '6-step LSTM malignancy rollout', 'var(--amber)'],
+            // Shared
+            ['Progression', '7-step LSTM simulation', 'var(--cyan)'],
+            ['3D Mesh', 'Vol · Surface · HD95', 'var(--teal)'],
+            ['COPD', 'Coming soon', 'var(--rim)'],
+          ].map(([label, desc, color]) => (
+            <div key={label} className="p-3 rounded-xl"
+              style={{ background: 'var(--panel)', border: '1px solid var(--rim)' }}>
+              <p className="font-mono text-xs font-500 mb-1" style={{ color }}>{label}</p>
+              <p className="text-xs opacity-50">{desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
   )
 }

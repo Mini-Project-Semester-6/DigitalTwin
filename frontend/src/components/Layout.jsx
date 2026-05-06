@@ -1,110 +1,57 @@
-import { Outlet, NavLink, useLocation } from 'react-router-dom'
-import { Activity, Upload, Clock, BarChart2, Cpu } from 'lucide-react'
+import { NavLink } from 'react-router-dom'
+import { Activity, Scan, Info, Cpu } from 'lucide-react'
 
-const navItems = [
-  { to: '/',                icon: Activity,  label: 'Dashboard' },
-  { to: '/upload',          icon: Upload,    label: 'LUNA Scan'  },
-  { to: '/osic/upload',     icon: Upload,    label: 'OSIC Scan'  },
-  { to: '/history',         icon: Clock,     label: 'History'   },
+const NAV = [
+  { to: '/',        label: 'Dashboard', Icon: Activity },
+  { to: '/analyze', label: 'Analyze',   Icon: Scan },
+  { to: '/about',   label: 'About',     Icon: Info },
 ]
 
-export default function Layout() {
+export default function Layout({ children }) {
   return (
-    <div className="min-h-screen flex flex-col grid-bg">
-      {/* Top bar */}
-      <header className="panel border-b border-border flex items-center justify-between px-6 py-3 sticky top-0 z-50">
+    <div className="min-h-screen flex flex-col relative z-10">
+      {/* ── Header ────────────────────────────────────── */}
+      <header style={{ background: 'var(--panel)', borderBottom: '1px solid var(--rim)' }}
+              className="flex items-center justify-between px-8 py-4 sticky top-0 z-50">
         <div className="flex items-center gap-3">
-          <div className="relative">
-            <div className="w-8 h-8 border border-accent flex items-center justify-center">
-              <Cpu size={16} className="text-accent" />
-            </div>
-            <div className="absolute -top-1 -right-1 w-2 h-2 bg-safe rounded-full animate-pulse" />
-          </div>
-          <div>
-            <div className="font-display font-bold text-lg text-black tracking-tight leading-none">
-              Pneuma<span className="text-accent">Twin</span>
-            </div>
-            <div className="label-tag" style={{ fontSize: '0.58rem' }}>
-              Lung Digital Twin Platform v1.0
-            </div>
-          </div>
+          <span className="relative flex h-3 w-3">
+            <span className="pulse-dot absolute inline-flex h-full w-full rounded-full"
+                  style={{ background: 'var(--teal)', opacity: .75 }} />
+            <span className="relative inline-flex rounded-full h-3 w-3"
+                  style={{ background: 'var(--teal)' }} />
+          </span>
+          <span className="font-display font-700 text-xl tracking-tight glow-cyan"
+                style={{ color: 'var(--cyan)' }}>
+            LungTwin
+          </span>
+          <span className="text-xs font-mono opacity-40 ml-1">COVID-19 Digital Twin</span>
         </div>
 
         <nav className="flex items-center gap-1">
-          {navItems.map(({ to, icon: Icon, label }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={to === '/'}
+          {NAV.map(({ to, label, Icon }) => (
+            <NavLink key={to} to={to} end={to === '/'}
               className={({ isActive }) =>
-                `flex items-center gap-2 px-4 py-2 text-xs font-mono uppercase tracking-widest transition-all duration-200 ${
-                  isActive
-                    ? 'text-accent border-b border-accent'
-                    : 'text-dim hover:text-black'
-                }`
-              }
-            >
-              <Icon size={13} />
+                `flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ` +
+                (isActive
+                  ? 'text-[var(--cyan)] bg-[rgba(0,212,232,0.12)]'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-[rgba(255,255,255,0.05)]')
+              }>
+              <Icon size={14} />
               {label}
             </NavLink>
           ))}
         </nav>
 
-        <div className="flex items-center gap-4">
-          <StatusPill />
-          <div className="text-right">
-            <div className="label-tag">System</div>
-            <div className="mono text-xs text-safe">ONLINE</div>
-          </div>
+        <div className="flex items-center gap-2 text-xs font-mono opacity-40">
+          <Cpu size={12} />
+          <span>v1.0.0</span>
         </div>
       </header>
 
-      {/* Ticker */}
-      <div className="border-b border-border bg-panel overflow-hidden" style={{ height: '26px' }}>
-        <div className="ticker-inner flex items-center h-full whitespace-nowrap" style={{ width: '200%' }}>
-          {[...Array(2)].map((_, rep) => (
-            <span key={rep} className="flex items-center gap-8 px-4">
-              {[
-                'MODEL: TINY3DCNN + GCN  ✦',
-                'PRECISION: FP16  ✦',
-                'PATCH SIZE: 32³  ✦',
-                'VOXEL SPACING: 2.0mm  ✦',
-                'DATASET: LUNA16 PRE-SEGMENTED  ✦',
-                'FEATURES: 16 GEOMETRIC + 64 CNN  ✦',
-                'MARCHING CUBES: ENABLED  ✦',
-                'GNN k-NN: k=5  ✦',
-              ].map(t => (
-                <span key={t} className="label-tag" style={{ fontSize: '0.6rem', color: 'var(--dim)' }}>
-                  {t}
-                </span>
-              ))}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {/* Main content */}
-      <main className="flex-1 p-6">
-        <Outlet />
+      {/* ── Main ──────────────────────────────────────── */}
+      <main className="flex-1 overflow-auto">
+        {children}
       </main>
-
-      {/* Footer */}
-      <footer className="panel border-t border-border px-6 py-3 flex items-center justify-between">
-        <span className="label-tag"> Research Use Only. Not for Clinical Diagnosis.</span>
-        <span className="mono text-xs text-dim">BUILD 20250419.001</span>
-      </footer>
-    </div>
-  )
-}
-
-function StatusPill() {
-  return (
-    <div className="flex items-center gap-2 panel px-3 py-1.5 border-border">
-      <div className="relative flex items-center justify-center w-3 h-3">
-        <div className="absolute w-3 h-3 bg-safe rounded-full opacity-30 animate-ping" />
-        <div className="w-1.5 h-1.5 bg-safe rounded-full" />
-      </div>
-      <span className="mono text-xs text-safe">MODEL READY</span>
     </div>
   )
 }
