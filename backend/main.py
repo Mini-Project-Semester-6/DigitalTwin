@@ -138,39 +138,6 @@ async def predict_cancer(files: List[UploadFile] = File(...)):
         raise HTTPException(status_code=500, detail="Cancer inference failed.")
 
 
-@app.post("/predict/fibrosis", tags=["inference"])
-async def predict_fibrosis(
-    files: List[UploadFile] = File(...),
-    age: int = 0,
-    sex: str = "unknown",
-    smoking_status: str = "unknown",
-    baseline_fvc: float = 0.0,
-):
-    """
-    Pulmonary fibrosis analysis: FVC regression, CI, stage (mild/moderate/severe), risk score.
-    Optional metadata: age, sex, smoking_status, baseline_fvc.
-    """
-    raw_bytes = [(f.filename or "", await f.read()) for f in files]
-    metadata  = {"age": age, "sex": sex,
-                 "smoking_status": smoking_status, "baseline_fvc": baseline_fvc}
-    
-    
-    try:
-        return JSONResponse(content=run_osic_fibrosis_pipeline(raw_bytes, metadata))
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
-    except Exception as e:
-        logger.exception("Fibrosis pipeline error: %s", e)
-        raise HTTPException(status_code=500, detail="Fibrosis inference failed.")
-    
-"""
-LUNA nodule detection from CT slices.
-Runs 3D U-Net segmentation, nodule classification (benign/malignant),
-and LSTM growth trajectory simulation.
-Returns: label, probabilities, segmentation MIP thumbnail,
-            candidate nodule list (centroid, volume, peak prob),
-            6-step trajectory.
-"""
 
 @app.get("/model-info", tags=["system"])
 async def model_info():

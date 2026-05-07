@@ -119,19 +119,9 @@ def load_dicom_folder(dicom_bytes_list: list[tuple[str, bytes]]) -> list[Image.I
 
 
 def load_slices(files_input: list[tuple[str, bytes]]) -> list[Image.Image]:
-    """
-    Auto-detect input type and return sorted PIL Images.
-
-    files_input: list of (filename, raw_bytes) tuples.
-      - If any file has a .dcm extension (or no extension):
-            → route through load_dicom_folder (full HU windowing pipeline)
-      - Otherwise (PNG / JPEG / TIFF):
-            → open directly with PIL, sort by filename digits
-    """
     if not files_input:
         raise ValueError("No files provided.")
 
-    # Check if inputs are DICOM
     dcm_exts = {'.dcm', '.dicom', ''}
     is_dicom = any(
         os.path.splitext(name.lower())[1] in dcm_exts
@@ -141,12 +131,11 @@ def load_slices(files_input: list[tuple[str, bytes]]) -> list[Image.Image]:
     if is_dicom:
         return load_dicom_folder(files_input)
 
-    # Plain image path — sort by digits in filename
+    # Plain image path
     parsed = []
     for filename, raw in files_input:
         try:
-            # img = Image.open(io.BytesIO(raw)).convert("RGB")
-            load_slices(image_bytes_list)
+            img = Image.open(io.BytesIO(raw)).convert("RGB")  # ← correct
         except Exception:
             continue
         digits = ''.join(filter(str.isdigit, filename))
