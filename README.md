@@ -1,4 +1,4 @@
-# 🫁 LungTwin — COVID-19 Lung Digital Twin
+# LungTwin — COVID-19 Lung Digital Twin
 
 A full-stack web application for COVID-19 detection and progression simulation
 using a Lung Digital Twin model. Upload CT scan slices and receive:

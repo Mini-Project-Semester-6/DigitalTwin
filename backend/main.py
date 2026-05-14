@@ -16,6 +16,7 @@ from inference import (run_full_pipeline, run_cancer_pipeline,
                        _load_models, _load_cancer_models,
                        _load_nodule_models, _load_osic_models)
 
+from db import get_db, list_sample_scans, get_sample_scan_bytes, seed_sample_scans_if_empty
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,6 +32,12 @@ async def lifespan(app: FastAPI):
     _load_cancer_models()
     logger.info("Loading OSIC Fibrosis models…")
     _load_osic_models()
+
+    try:
+        await seed_sample_scans_if_empty()
+        logger.info("MongoDB Atlas connected")
+    except Exception as e:
+        logger.warning("MongoDB unavailable (sample scans disabled): %s", e)
     yield
 
 
@@ -165,3 +172,87 @@ async def model_info():
             },
         ]
     }
+
+@app.get("/samples", tags=["samples"])
+async def list_samples(condition: str | None = None):
+    """
+    List all available sample CT scans (no slice data, just metadata + thumbnail).
+    Optionally filter by condition: covid19 | cancer | fibrosis | nodules
+    """
+    try:
+        samples = await list_sample_scans(condition)
+        return JSONResponse(content={"samples": samples, "count": len(samples)})
+    except Exception as e:
+        logger.exception("Failed to list samples: %s", e)
+        raise HTTPException(status_code=503, detail="Sample database unavailable.")
+
+
+@app.get("/samples/{scan_id}", tags=["samples"])
+async def get_sample(scan_id: str):
+    """
+    Get metadata for a single sample scan (without running inference).
+    """
+    try:
+        from db import get_sample_scan
+        doc = await get_sample_scan(scan_id)
+        if not doc:
+            raise HTTPException(status_code=404, detail="Sample not found.")
+        doc.pop("slices", None)   # don't send raw slices in metadata call
+        return JSONResponse(content=doc)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("get_sample error: %s", e)
+        raise HTTPException(status_code=503, detail="Sample database unavailable.")
+
+
+@app.post("/samples/{scan_id}/predict", tags=["samples"])
+async def predict_from_sample(
+    scan_id: str,
+    condition: str = "covid19",
+    age: int = 65,
+    sex: str = "Male",
+    smoking_status: str = "Ex-smoker",
+    baseline_fvc: float = 2600.0,
+    weeks: float = 0.0,
+):
+    """
+    Run the full inference pipeline on a stored sample scan.
+    The scan's own metadata is used for fibrosis if present.
+    """
+    try:
+        file_tuples, scan_meta = await get_sample_scan_bytes(scan_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.exception("Sample fetch error: %s", e)
+        raise HTTPException(status_code=503, detail="Sample database unavailable.")
+
+    # Use metadata stored in the document if available
+    if scan_meta:
+        age            = scan_meta.get("age",            age)
+        sex            = scan_meta.get("sex",            sex)
+        smoking_status = scan_meta.get("smoking_status", smoking_status)
+        baseline_fvc   = scan_meta.get("baseline_fvc",  baseline_fvc)
+        weeks          = scan_meta.get("weeks",          weeks)
+
+    try:
+        if condition == "cancer":
+            result = run_cancer_pipeline(file_tuples)
+        elif condition == "fibrosis":
+            result = run_osic_fibrosis_pipeline(
+                file_tuples, age=age, sex=sex,
+                smoking_status=smoking_status,
+                baseline_fvc=baseline_fvc, weeks=weeks)
+        elif condition == "nodules":
+            raise HTTPException(status_code=503, detail="Nodule detection temporarily disabled.")
+        else:
+            result = run_full_pipeline(file_tuples)
+        return JSONResponse(content=result)
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        logger.exception("Sample inference error: %s", e)
+        raise HTTPException(status_code=500, detail="Inference failed.")

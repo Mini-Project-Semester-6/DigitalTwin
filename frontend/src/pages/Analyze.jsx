@@ -4,6 +4,7 @@ import { Loader2, FlaskConical, Trash2, Download } from 'lucide-react'
 import CTUploader from '../components/CTUploader'
 import ResultsPanel from '../components/ResultsPanel'
 import { runPrediction, runCancerPrediction, runFibrosisPrediction, runNodulePrediction } from '../utils/api'
+import SampleScans from '../components/SampleScans'
 
 export default function Analyze() {
   const [files, setFiles] = useState([])
@@ -27,6 +28,12 @@ export default function Analyze() {
     'Simulating disease progression…',
     'Decoding latent state…',
   ]
+
+  const handleSampleResult = (data) => {
+    setResult(data)
+    // Sync the condition selector to match the sample's condition
+    if (data.condition) setCondition(data.condition)
+  }
 
   const handleRun = async () => {
     if (!files.length) { toast.error('Please upload at least one CT slice.'); return }
@@ -76,11 +83,8 @@ export default function Analyze() {
             { id: 'covid19', label: 'COVID-19', color: 'var(--cyan)' },
             { id: 'cancer', label: 'Lung Cancer', color: 'var(--coral)' },
             { id: 'fibrosis', label: 'Pulmonary Fibrosis', color: 'var(--lavender)' },
-            { id: 'nodules', label: 'Nodule Detection', color: 'var(--teal)' },
-            {
-              id: 'copd', label: 'COPD', color: 'var(--amber)',
-              disabled: true
-            },
+            // { id: 'nodules', label: 'Nodule Detection', color: 'var(--teal)' },
+    
           ].map(({ id, label, color, disabled }) => (
             <button
               key={id}
@@ -166,6 +170,19 @@ export default function Analyze() {
             </div>
           </div>
         )}
+
+        {/* Sample scans from Atlas */}
+        <SampleScans
+          onResult={handleSampleResult}
+          currentCondition={condition}
+        />
+
+        {/* Divider */}
+        <div className="flex items-center gap-3">
+          <div className="flex-1 h-px" style={{ background: 'var(--rim)' }} />
+          <span className="text-xs font-mono opacity-40">or upload your own</span>
+          <div className="flex-1 h-px" style={{ background: 'var(--rim)' }} />
+        </div>
 
         <CTUploader files={files} setFiles={setFiles} />
 

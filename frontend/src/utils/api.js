@@ -10,6 +10,30 @@ export const api = axios.create({ baseURL: API_BASE })
  * @returns {Promise<object>}
  */
 
+export async function fetchSamples(condition = null) {
+  const params = condition ? `?condition=${condition}` : ''
+  const { data } = await api.get(`/samples${params}`)
+  return data   // { samples: [...], count: n }
+}
+
+export async function fetchSampleMeta(scanId) {
+  const { data } = await api.get(`/samples/${scanId}`)
+  return data
+}
+
+export async function runSamplePrediction(scanId, condition, metadata = {}) {
+  const params = new URLSearchParams({
+    condition,
+    age:            metadata.age            ?? 65,
+    sex:            metadata.sex            ?? 'Male',
+    smoking_status: metadata.smoking_status ?? 'Ex-smoker',
+    baseline_fvc:   metadata.baseline_fvc   ?? 2600.0,
+    weeks:          metadata.weeks          ?? 0.0,
+  }).toString()
+  const { data } = await api.post(`/samples/${scanId}/predict?${params}`)
+  return data
+}
+
 export async function runPrediction(files) {
   const form = new FormData()
   files.forEach(f => form.append('files', f))

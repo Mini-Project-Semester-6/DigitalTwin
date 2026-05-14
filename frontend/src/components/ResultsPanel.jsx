@@ -4,12 +4,11 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Legend,
 } from 'recharts'
 import { Shield, AlertTriangle, Activity, Layers, Clock } from 'lucide-react'
+import CTViewer3D from './CTViewer3D'
 
 /* ── helpers ──────────────────────────────────────────────────────────────── */
 const VARIANT_COLOR = { 'COVID-Negative': '#00b89f', 'COVID-Positive': '#ff5c5c' }
 const VARIANT_ICON = { 'COVID-Negative': Shield, 'COVID-Positive': AlertTriangle }
-
-
 
 
 function Stat({ label, value, unit = '', accent = 'var(--cyan)' }) {
@@ -153,7 +152,7 @@ function MeshCard({ mesh }) {
 }
 
 /* ── CT Reconstruction card ───────────────────────────────────────────────── */
-function ReconCard({ reconstruction }) {
+function ReconCard({ reconstruction, volumeSlices }) {
   const src = `data:image/png;base64,${reconstruction.base64_png}`
   return (
     <div className="rounded-2xl p-6 space-y-4 slide-up delay-200"
@@ -176,6 +175,9 @@ function ReconCard({ reconstruction }) {
             style={{ background: 'linear-gradient(135deg,rgba(0,212,232,0.05),transparent)' }} />
         </div>
       </div>
+      {volumeSlices?.length > 0 && (
+        <CTViewer3D volumeSlices={volumeSlices} />
+      )}
       <p className="text-center text-xs font-mono opacity-40">
         64×64 latent-space reconstruction · Digital Twin output
       </p>
@@ -331,6 +333,9 @@ function CancerResultsPanel({ result }) {
         </div>
       </div>
       <MeshCard mesh={mesh} />
+      {result.volume_slices?.length > 0 && (
+        <CTViewer3D volumeSlices={result.volume_slices} />
+      )}
       <ProgressionCard progression={progression} />
       <MetricsBar metrics={metrics} />
     </div>
@@ -749,6 +754,9 @@ export default function ResultsPanel({ result }) {
         <MeshCard mesh={mesh} />
         <ReconCard reconstruction={reconstruction} />
       </div>
+      {result.volume_slices?.length > 0 && (
+        <CTViewer3D volumeSlices={result.volume_slices} />
+      )}
       <ProgressionCard progression={progression} />
       <MetricsBar metrics={metrics} />
     </div>

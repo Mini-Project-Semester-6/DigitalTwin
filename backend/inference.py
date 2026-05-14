@@ -149,6 +149,25 @@ def load_slices(files_input: list[tuple[str, bytes]]) -> list[Image.Image]:
     return [img for _, img in parsed]
 
 
+def export_volume_slices(slices: list, max_slices: int = 64,
+                          size: int = 128) -> list[str]:
+    """
+    Downsample the slice stack to max_slices evenly spaced slices,
+    resize each to size×size, and return as a list of base64 PNG strings.
+    The frontend 3D viewer consumes this list directly.
+    """
+    n = len(slices)
+    indices = [int(i * n / max_slices) for i in range(min(max_slices, n))]
+    result = []
+    for idx in indices:
+        img = slices[idx].convert("L").resize((size, size), Image.BILINEAR)
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        b64 = base64.b64encode(buf.getvalue()).decode()
+        result.append(b64)
+    return result
+
+# uvicorn main:app --host 0.0.0.0 --port 8000 --reload 
 def _load_nodule_models():
     global _unet, _nodule_clf, _nodule_lstm
 
@@ -352,6 +371,7 @@ def run_osic_fibrosis_pipeline(image_bytes_list: list[tuple[str, bytes]],
     _load_osic_models()
 
     slices = load_slices(image_bytes_list)
+    volume_b64 = export_volume_slices(slices)
     if not slices:
         raise ValueError("No CT slices provided.")
 
@@ -414,6 +434,7 @@ def run_osic_fibrosis_pipeline(image_bytes_list: list[tuple[str, bytes]],
             "slices_processed": len(slices),
             "device":           str(DEVICE),
         },
+        "volume_slices": volume_b64,  
     }
 
 
@@ -516,6 +537,7 @@ def run_cancer_pipeline(image_bytes_list: list[tuple[str, bytes]]) -> dict:
     _load_cancer_models()
 
     slices = load_slices(image_bytes_list)
+    volume_b64 = export_volume_slices(slices)
     if not slices:
         raise ValueError("No valid CT slices provided.")
 
@@ -558,6 +580,7 @@ def run_cancer_pipeline(image_bytes_list: list[tuple[str, bytes]]) -> dict:
             "slices_processed": len(slices),
             "device": str(DEVICE),
         },
+        "volume_slices": volume_b64,  
     }
 
 
@@ -572,6 +595,7 @@ def run_fibrosis_pipeline(image_bytes_list: list[tuple[str, bytes]],
     _load_cancer_models()   # same weights
 
     slices = load_slices(image_bytes_list)
+    volume_b64 = export_volume_slices(slices)
     if not slices:
         raise ValueError("No valid CT slices provided.")
 
@@ -787,6 +811,7 @@ def run_nodule_pipeline(image_bytes_list: list[tuple[str, bytes]]) -> dict:
     _load_nodule_models()
 
     slices = load_slices(image_bytes_list)
+    volume_b64 = export_volume_slices(slices)
     if not slices:
         raise ValueError("No CT slices provided.")
 
@@ -1014,6 +1039,7 @@ def run_full_pipeline(image_bytes_list: list[tuple[str, bytes]]) -> dict:
     # Decode all slices
     slices = []
     slices = load_slices(image_bytes_list)
+    volume_b64 = export_volume_slices(slices)
 
     # ── Step 1: build 2.5D stacked input ──────────────────────────────────
     img_tensor = build_stacked_input(slices).unsqueeze(0).to(DEVICE)  # (1,3,224,224)
@@ -1064,6 +1090,7 @@ def run_full_pipeline(image_bytes_list: list[tuple[str, bytes]]) -> dict:
             "slices_processed": len(slices),
             "device": str(DEVICE),
         },
+        "volume_slices": volume_b64,   
     }
 
 
