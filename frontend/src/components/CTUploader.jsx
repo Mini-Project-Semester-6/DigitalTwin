@@ -89,13 +89,6 @@ export default function CTUploader({ files, setFiles }) {
               }}
             />
           </label>
-
-          <div className="flex items-center gap-4 text-xs font-mono opacity-40 mt-1">
-            <span>DCM</span><span>·</span>
-            <span>PNG</span><span>·</span>
-            <span>JPEG</span><span>·</span>
-            <span>TIFF</span>
-          </div>
         </div>
       </div>
 

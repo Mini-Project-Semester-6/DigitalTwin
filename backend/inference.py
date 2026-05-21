@@ -75,9 +75,6 @@ def load_dicom_folder(dicom_bytes_list: list[tuple[str, bytes]]) -> list[Image.I
 
     Returns a list of PIL Images in anatomically correct Z order.
     """
-    import pydicom
-    from pydicom.pixel_data_handlers import pylibjpeg_handler
-    pydicom.config.pixel_data_handlers = [pylibjpeg_handler]
     parsed = []
     for filename, raw in dicom_bytes_list:
         try:
@@ -149,23 +146,46 @@ def load_slices(files_input: list[tuple[str, bytes]]) -> list[Image.Image]:
     return [img for _, img in parsed]
 
 
-def export_volume_slices(slices: list, max_slices: int = 64,
-                          size: int = 128) -> list[str]:
+def export_volume_slices(slices: list, max_slices: int = 128,
+                          size: int = 256) -> dict:
     """
-    Downsample the slice stack to max_slices evenly spaced slices,
-    resize each to size×size, and return as a list of base64 PNG strings.
-    The frontend 3D viewer consumes this list directly.
+    Export the CT volume as:
+      - voxels_b64: base64-encoded float32 flat array (D × H × W), values in [0,1]
+      - dims: [D, H, W]
+      - spacing: [1.0, 1.0, 1.5]   (approximate isotropic voxel spacing)
+      - legacy_slices: list of 64 base64 PNGs for the old 2D viewer fallback
     """
-    n = len(slices)
-    indices = [int(i * n / max_slices) for i in range(min(max_slices, n))]
-    result = []
-    for idx in indices:
-        img = slices[idx].convert("L").resize((size, size), Image.BILINEAR)
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        b64 = base64.b64encode(buf.getvalue()).decode()
-        result.append(b64)
-    return result
+    import struct
+
+    n  = len(slices)
+    D  = min(max_slices, n)
+    HW = size
+
+    # Sample D evenly-spaced slices, resize to HW×HW, build float32 volume
+    indices = [int(i * n / D) for i in range(D)]
+    vol = np.zeros((D, HW, HW), dtype=np.float32)
+    legacy = []
+
+    for out_z, idx in enumerate(indices):
+        img   = slices[idx].convert("L").resize((HW, HW), Image.BILINEAR)
+        arr   = np.array(img, dtype=np.float32) / 255.0
+        vol[out_z] = arr
+
+        if out_z % (D // 64 + 1) == 0 and len(legacy) < 64:
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            legacy.append(base64.b64encode(buf.getvalue()).decode())
+
+    # Serialise as raw float32 little-endian bytes → base64
+    raw_bytes = vol.astype(np.float32).tobytes()
+    voxels_b64 = base64.b64encode(raw_bytes).decode()
+
+    return {
+        "voxels_b64": voxels_b64,
+        "dims":       [D, HW, HW],
+        "spacing":    [1.5, 1.0, 1.0],
+        "legacy_slices": legacy,
+    }
 
 # uvicorn main:app --host 0.0.0.0 --port 8000 --reload 
 def _load_nodule_models():
@@ -434,7 +454,7 @@ def run_osic_fibrosis_pipeline(image_bytes_list: list[tuple[str, bytes]],
             "slices_processed": len(slices),
             "device":           str(DEVICE),
         },
-        "volume_slices": volume_b64,  
+        "volume_data": export_volume_slices(slices),  
     }
 
 
@@ -580,7 +600,7 @@ def run_cancer_pipeline(image_bytes_list: list[tuple[str, bytes]]) -> dict:
             "slices_processed": len(slices),
             "device": str(DEVICE),
         },
-        "volume_slices": volume_b64,  
+        "volume_data": export_volume_slices(slices),  
     }
 
 
@@ -864,7 +884,6 @@ def run_nodule_pipeline(image_bytes_list: list[tuple[str, bytes]]) -> dict:
 def preprocess_ct_slice(pil_img: Image.Image) -> torch.Tensor:
     """
     Converts a CT PNG slice (grayscale or RGB) to the 3-channel 224×224 tensor
-    the 2.5D encoder expects, using standard ImageNet normalisation.
     """
     img = pil_img.convert("RGB").resize((IMG_SIZE, IMG_SIZE), Image.BILINEAR)
     arr = np.array(img, dtype=np.float32) / 255.0
@@ -1007,7 +1026,10 @@ def simulate_progression_from_z(z0: torch.Tensor, steps: int = SEQ_STEPS
     Given initial latent z0 (320-d fused), roll forward `steps` time-steps.
     The progression LSTM expects 256-d input; we take first 256 dims.
     Returns a list of {step, severity, delta_norm} dicts.
+    Uses _cancer_prog if available (called from cancer pipeline),
+    otherwise falls back to _prog (called from covid pipeline).
     """
+    prog_model = _cancer_prog if _cancer_prog is not None else _prog
     results = []
     # Projection: use first 256 dims of the fused 320-d vector
     z = z0[:, :LATENT_DIM].clone().to(DEVICE)            # (1, 256)
@@ -1015,7 +1037,7 @@ def simulate_progression_from_z(z0: torch.Tensor, steps: int = SEQ_STEPS
     with torch.no_grad():
         for t in range(steps):
             seq = z.unsqueeze(1)                          # (1, 1, 256)
-            z_next, sev = _prog(seq)
+            z_next, sev = prog_model(seq)
             delta = float((z_next - z).norm().item())
             results.append({
                 "step": t + 1,
@@ -1090,7 +1112,7 @@ def run_full_pipeline(image_bytes_list: list[tuple[str, bytes]]) -> dict:
             "slices_processed": len(slices),
             "device": str(DEVICE),
         },
-        "volume_slices": volume_b64,   
+        "volume_data": export_volume_slices(slices),  
     }
 
 

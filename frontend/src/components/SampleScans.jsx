@@ -36,10 +36,10 @@ export default function SampleScans({ onResult, currentCondition }) {
     try {
       const result = await runSamplePrediction(
         scan._id,
-        scan.condition,
+        currentCondition,         
         scan.metadata || {}
       )
-      onResult(result)
+      onResult({ ...result, condition: currentCondition })
       toast.success(`Sample analysis complete — ${scan.title}`)
     } catch (err) {
       toast.error(err?.response?.data?.detail || 'Sample inference failed')

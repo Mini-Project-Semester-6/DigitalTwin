@@ -10,7 +10,6 @@ import CTViewer3D from './CTViewer3D'
 const VARIANT_COLOR = { 'COVID-Negative': '#00b89f', 'COVID-Positive': '#ff5c5c' }
 const VARIANT_ICON = { 'COVID-Negative': Shield, 'COVID-Positive': AlertTriangle }
 
-
 function Stat({ label, value, unit = '', accent = 'var(--cyan)' }) {
   return (
     <div className="flex flex-col gap-1 p-4 rounded-xl"
@@ -35,6 +34,82 @@ function SeverityBar({ value }) {
         <div className="h-full rounded-full bar-animate"
           style={{ width: `${pct}%`, background: color }} />
       </div>
+    </div>
+  )
+}
+
+/* ── Severity & Metrics card (shared across all models) ──────────────────── */
+function SeverityMetricsCard({ result, accentColor = 'var(--cyan)' }) {
+  const pred = result.prediction ?? {}
+  const metrics = result.metrics ?? {}
+
+  const severityVal = pred.severity_score ?? pred.severity ?? null
+  const severityPct = severityVal != null ? Math.round(severityVal * 100) : null
+  const sevColor = severityPct == null ? '#7a94b0'
+    : severityPct < 30 ? 'var(--teal)'
+      : severityPct < 65 ? 'var(--amber)'
+        : 'var(--coral)'
+
+  // collect all numeric metrics from the metrics object
+  const metricRows = Object.entries(metrics).filter(([, v]) => typeof v === 'number')
+
+  if (severityVal == null && metricRows.length === 0) return null
+
+  return (
+    <div className="rounded-2xl p-6 space-y-5 slide-up"
+      style={{ background: 'var(--card)', border: `1px solid ${accentColor}33` }}>
+
+      <div className="flex items-center gap-2">
+        <Activity size={18} style={{ color: accentColor }} />
+        <h3 className="font-display font-600 text-base">Severity Score & Metrics</h3>
+      </div>
+
+      {/* Severity gauge */}
+      {severityVal != null && (
+        <div className="space-y-2">
+          <div className="flex justify-between items-end">
+            <span className="text-xs font-mono uppercase tracking-widest opacity-40">Severity Score</span>
+            <span className="font-display font-700 text-2xl" style={{ color: sevColor }}>
+              {severityPct}%
+            </span>
+          </div>
+          <div className="h-3 rounded-full overflow-hidden" style={{ background: 'var(--rim)' }}>
+            <div className="h-full rounded-full bar-animate transition-all duration-700"
+              style={{ width: `${severityPct}%`, background: sevColor }} />
+          </div>
+          <div className="flex justify-between text-xs font-mono opacity-30">
+            <span>Low</span><span>Moderate</span><span>High</span>
+          </div>
+        </div>
+      )}
+
+      {/* Metrics grid */}
+      {metricRows.length > 0 && (
+        <div>
+          <p className="text-xs font-mono uppercase tracking-widest opacity-40 mb-3">Model Metrics</p>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+            {metricRows.map(([key, val]) => {
+              const display = Number.isInteger(val)
+                ? val.toLocaleString()
+                : val < 1 && val > 0
+                  ? `${(val * 100).toFixed(2)}%`
+                  : val.toFixed(4)
+              const label = key
+                .replace(/_/g, ' ')
+                .replace(/\b\w/g, c => c.toUpperCase())
+              return (
+                <div key={key} className="p-3 rounded-xl"
+                  style={{ background: 'var(--panel)', border: '1px solid var(--rim)' }}>
+                  <p className="text-xs font-mono opacity-40 mb-1 truncate">{label}</p>
+                  <p className="font-display font-600 text-base" style={{ color: accentColor }}>
+                    {display}
+                  </p>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -74,6 +149,8 @@ function VariantCard({ prediction }) {
       </div>
 
       <SeverityBar value={severity_score} />
+
+
 
       {/* Radar chart */}
       <div className="h-48">
@@ -128,61 +205,11 @@ function MeshCard({ mesh }) {
     { label: 'HD95 approx', value: mesh.hausdorff_approx_mm, unit: 'mm' },
     { label: 'Slices', value: mesh.slice_count },
   ]
-  return (
-    <div className="rounded-2xl p-6 space-y-4 slide-up delay-100"
-      style={{ background: 'var(--card)', border: '1px solid var(--rim)' }}>
-      <div className="flex items-center gap-2">
-        <Layers size={18} style={{ color: 'var(--lavender)' }} />
-        <h3 className="font-display font-600 text-base">3-D Mesh & Geometric Features</h3>
-      </div>
-      <div className="grid grid-cols-3 gap-3">
-        {items.map(({ label, value, unit }) => (
-          <div key={label} className="p-3 rounded-xl text-center"
-            style={{ background: 'var(--panel)', border: '1px solid var(--rim)' }}>
-            <p className="text-xs font-mono opacity-40 mb-1">{label}</p>
-            <p className="font-display font-600 text-lg" style={{ color: 'var(--lavender)' }}>
-              {value}
-              {unit && <span className="text-xs opacity-50 ml-1">{unit}</span>}
-            </p>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
 }
 
 /* ── CT Reconstruction card ───────────────────────────────────────────────── */
-function ReconCard({ reconstruction, volumeSlices }) {
+function ReconCard({ reconstruction, volumeData }) {
   const src = `data:image/png;base64,${reconstruction.base64_png}`
-  return (
-    <div className="rounded-2xl p-6 space-y-4 slide-up delay-200"
-      style={{ background: 'var(--card)', border: '1px solid var(--rim)' }}>
-      <div className="flex items-center gap-2">
-        <Activity size={18} style={{ color: 'var(--teal)' }} />
-        <h3 className="font-display font-600 text-base">CT Slice Reconstruction (Digital Twin)</h3>
-      </div>
-      <div className="flex justify-center">
-        <div className="relative group">
-          <img src={src} alt="reconstructed CT"
-            className="ct-flicker rounded-lg"
-            style={{
-              width: 192, height: 192,
-              imageRendering: 'pixelated',
-              filter: 'brightness(1.1) contrast(1.2)',
-              boxShadow: '0 0 32px rgba(0,212,232,0.2)',
-            }} />
-          <div className="absolute inset-0 rounded-lg pointer-events-none"
-            style={{ background: 'linear-gradient(135deg,rgba(0,212,232,0.05),transparent)' }} />
-        </div>
-      </div>
-      {volumeSlices?.length > 0 && (
-        <CTViewer3D volumeSlices={volumeSlices} />
-      )}
-      <p className="text-center text-xs font-mono opacity-40">
-        64×64 latent-space reconstruction · Digital Twin output
-      </p>
-    </div>
-  )
 }
 
 /* ── Progression chart ────────────────────────────────────────────────────── */
@@ -259,22 +286,9 @@ function ProgressionCard({ progression }) {
 /* ── Metrics footer ───────────────────────────────────────────────────────── */
 function MetricsBar({ metrics }) {
   return (
-    <div className="flex flex-wrap items-center gap-6 px-4 py-3 rounded-xl slide-up delay-400"
-      style={{ background: 'var(--panel)', border: '1px solid var(--rim)' }}>
-      {[
-        ['Inference', `${metrics.inference_time_s}s`],
-        ['Slices', metrics.slices_processed],
-        ['Device', metrics.device.toUpperCase()],
-      ].map(([label, val]) => (
-        <div key={label} className="flex items-center gap-2 text-xs font-mono">
-          <span className="opacity-40">{label}</span>
-          <span style={{ color: 'var(--cyan)' }}>{val}</span>
-        </div>
-      ))}
-    </div>
+    <></>
   )
 }
-
 
 function CancerResultsPanel({ result }) {
   const { prediction, mesh, progression, metrics } = result
@@ -333,9 +347,10 @@ function CancerResultsPanel({ result }) {
         </div>
       </div>
       <MeshCard mesh={mesh} />
-      {result.volume_slices?.length > 0 && (
-        <CTViewer3D volumeSlices={result.volume_slices} />
+      {result.volume_data?.voxels_b64 && (
+        <CTViewer3D volumeData={result.volume_data} />
       )}
+      <SeverityMetricsCard result={result} accentColor="var(--coral)" />
       <ProgressionCard progression={progression} />
       <MetricsBar metrics={metrics} />
     </div>
@@ -490,13 +505,13 @@ function FibrosisResultsPanel({ result }) {
           </table>
         </div>
       </div>
+      <SeverityMetricsCard result={result} accentColor="var(--lavender)" />
+      {/* <ProgressionCard progression={projection} /> */}
       <MetricsBar metrics={metrics} />
       {result.metadata_used && (
         <div className="rounded-2xl p-4 slide-up delay-400"
           style={{ background: 'var(--card)', border: '1px solid var(--rim)' }}>
-          <p className="text-xs font-mono opacity-40 mb-3 uppercase tracking-widest">
-            Clinical Inputs Used
-          </p>
+
           <div className="flex flex-wrap gap-3">
             {Object.entries(result.metadata_used).map(([k, v]) => (
               <div key={k} className="px-3 py-1.5 rounded-lg"
@@ -750,12 +765,13 @@ export default function ResultsPanel({ result }) {
   return (
     <div className="space-y-5">
       <VariantCard prediction={prediction} />
+      <SeverityMetricsCard result={result} accentColor="var(--cyan)" />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <MeshCard mesh={mesh} />
         <ReconCard reconstruction={reconstruction} />
       </div>
-      {result.volume_slices?.length > 0 && (
-        <CTViewer3D volumeSlices={result.volume_slices} />
+      {result.volume_data && (
+        <CTViewer3D volumeData={result.volume_data} />
       )}
       <ProgressionCard progression={progression} />
       <MetricsBar metrics={metrics} />

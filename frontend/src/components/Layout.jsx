@@ -1,16 +1,20 @@
 import { NavLink } from 'react-router-dom'
-import { Activity, Scan, Info, Cpu } from 'lucide-react'
+import { Activity, Scan, Info, Cpu, FileText } from 'lucide-react'
+import { useResultsStore } from '../hooks/useResultsStore'
 
 const NAV = [
-  { to: '/',        label: 'Dashboard', Icon: Activity },
-  { to: '/analyze', label: 'Analyze',   Icon: Scan },
-  { to: '/about',   label: 'About',     Icon: Info },
+  { to: '/',          label: 'Analyze',   Icon: Activity },
+  { to: '/dashboard', label: 'Dashboard', Icon: Scan     },
+  { to: '/report',    label: 'Report',    Icon: FileText },
+  { to: '/about',     label: 'About',     Icon: Info     },
 ]
 
 export default function Layout({ children }) {
+  const { results } = useResultsStore()
+  const completedCount = Object.values(results).filter(Boolean).length
+
   return (
     <div className="min-h-screen flex flex-col relative z-10">
-      {/* ── Header ────────────────────────────────────── */}
       <header style={{ background: 'var(--panel)', borderBottom: '1px solid var(--rim)' }}
               className="flex items-center justify-between px-8 py-4 sticky top-0 z-50">
         <div className="flex items-center gap-3">
@@ -24,20 +28,26 @@ export default function Layout({ children }) {
                 style={{ color: 'var(--cyan)' }}>
             LungTwin
           </span>
-          <span className="text-xs font-mono opacity-40 ml-1">COVID-19 Digital Twin</span>
+          <span className="text-xs font-mono opacity-40 ml-1">Pulmonary Digital Twin</span>
         </div>
 
         <nav className="flex items-center gap-1">
           {NAV.map(({ to, label, Icon }) => (
             <NavLink key={to} to={to} end={to === '/'}
               className={({ isActive }) =>
-                `flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ` +
+                `relative flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ` +
                 (isActive
                   ? 'text-[var(--cyan)] bg-[rgba(0,212,232,0.12)]'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-[rgba(255,255,255,0.05)]')
               }>
               <Icon size={14} />
               {label}
+              {to === '/report' && completedCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold"
+                  style={{ background: 'var(--cyan)', color: 'var(--deep)' }}>
+                  {completedCount}
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>
@@ -48,7 +58,6 @@ export default function Layout({ children }) {
         </div>
       </header>
 
-      {/* ── Main ──────────────────────────────────────── */}
       <main className="flex-1 overflow-auto">
         {children}
       </main>

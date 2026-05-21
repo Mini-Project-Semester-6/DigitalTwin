@@ -1,91 +1,186 @@
+/* ── Import Tabler tokens ──────────────────────────────────────────── */
+@import "@tabler/core/dist/css/tabler.min.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ── Override Tabler dark-mode variables to match LungTwin palette ── */
 :root {
-  --deep:     #050b14;
-  --panel:    #0a1628;
-  --card:     #0f1f35;
-  --rim:      #1a3050;
-  --cyan:     #00d4e8;
-  --teal:     #00b89f;
-  --coral:    #ff5c5c;
-  --amber:    #f5a623;
-  --lavender: #9b8aff;
+  /* Core backgrounds */
+  --tblr-body-bg:              #0A1628;
+  --tblr-bg-surface:           #0F1F35;
+  --tblr-bg-surface-secondary: #132840;
+  --tblr-bg-surface-tertiary:  #1A3050;
+
+  /* Brand colours */
+  --tblr-primary:              #00D4E8;
+  --tblr-primary-rgb:          0, 212, 232;
+  --tblr-secondary:            #00B89F;
+  --tblr-secondary-rgb:        0, 184, 159;
+  --tblr-success:              #22C55E;
+  --tblr-warning:              #F5A623;
+  --tblr-danger:               #FF5C5C;
+  --tblr-info:                 #9B8AFF;
+
+  /* Text */
+  --tblr-body-color:           #E2EAF4;
+  --tblr-muted:                #7A94B0;
+  --tblr-border-color:         #1A3050;
+
+  /* Card / panel */
+  --tblr-card-bg:              #0F1F35;
+  --tblr-card-border-color:    #1A3050;
+  --tblr-card-cap-bg:          #132840;
+
+  /* Navbar */
+  --tblr-navbar-bg:            #0F1F35;
+  --tblr-navbar-border-color:  #1A3050;
+
+  /* Sidebar */
+  --tblr-sidebar-bg:           #0A1628;
+  --tblr-sidebar-border-color: #1A3050;
+
+  /* Form controls */
+  --tblr-input-bg:             #132840;
+  --tblr-input-border-color:   #1A3050;
+  --tblr-input-color:          #E2EAF4;
+  --tblr-input-focus-border-color: #00D4E8;
+
+  /* Typography */
+  --tblr-font-sans-serif: "DM Sans", system-ui, -apple-system, sans-serif;
+  --tblr-font-monospace:  "JetBrains Mono", "SFMono-Regular", monospace;
+  --tblr-body-font-size:  0.875rem;
+  --tblr-border-radius:   0.5rem;
+  --tblr-border-radius-lg: 0.75rem;
+  --tblr-border-radius-xl: 1rem;
+
+  /* LungTwin aliases (keep existing code working) */
+  --deep:     #0A1628;
+  --panel:    #0F1F35;
+  --card:     #132840;
+  --rim:      #1A3050;
+  --cyan:     #00D4E8;
+  --teal:     #00B89F;
+  --coral:    #FF5C5C;
+  --amber:    #F5A623;
+  --lavender: #9B8AFF;
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
-
-html, body, #root {
-  height: 100%;
-  background: var(--deep);
-  color: #e2eaf4;
-  font-family: 'DM Sans', system-ui;
+/* ── Force dark theme on Tabler components ──────────────────────────── */
+body {
+  background-color: var(--tblr-body-bg) !important;
+  color:            var(--tblr-body-color) !important;
+  font-family:      var(--tblr-font-sans-serif);
   -webkit-font-smoothing: antialiased;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: var(--panel); }
-::-webkit-scrollbar-thumb { background: var(--rim); border-radius: 3px; }
+/* ── Tabler card overrides ──────────────────────────────────────────── */
+.card {
+  background-color: var(--tblr-card-bg) !important;
+  border-color:     var(--tblr-card-border-color) !important;
+  color:            var(--tblr-body-color) !important;
+}
+.card-header, .card-footer {
+  background-color: var(--tblr-card-cap-bg) !important;
+  border-color:     var(--tblr-border-color) !important;
+}
 
-/* Scan line overlay on deep bg */
+/* ── Navbar ─────────────────────────────────────────────────────────── */
+.navbar {
+  background-color: var(--tblr-navbar-bg) !important;
+  border-bottom:    1px solid var(--tblr-navbar-border-color) !important;
+}
+.navbar-brand { color: var(--tblr-primary) !important; font-weight: 700; }
+.nav-link     { color: var(--tblr-muted) !important; }
+.nav-link:hover, .nav-link.active {
+  color: var(--tblr-primary) !important;
+  background: rgba(0,212,232,0.1) !important;
+}
+
+/* ── Sidebar ────────────────────────────────────────────────────────── */
+.navbar-vertical {
+  background-color: var(--tblr-sidebar-bg) !important;
+  border-right:     1px solid var(--tblr-sidebar-border-color) !important;
+}
+
+/* ── Buttons ────────────────────────────────────────────────────────── */
+.btn-primary {
+  background-color: var(--tblr-primary) !important;
+  border-color:     var(--tblr-primary) !important;
+  color:            #0A1628 !important;
+  font-weight:      600;
+}
+.btn-primary:hover {
+  box-shadow: 0 0 20px rgba(0,212,232,0.35) !important;
+}
+.btn-outline-primary {
+  color:        var(--tblr-primary) !important;
+  border-color: var(--tblr-primary) !important;
+}
+.btn-outline-secondary {
+  color:        var(--tblr-muted) !important;
+  border-color: var(--tblr-border-color) !important;
+}
+
+/* ── Form controls ──────────────────────────────────────────────────── */
+.form-control, .form-select {
+  background-color: var(--tblr-input-bg) !important;
+  border-color:     var(--tblr-input-border-color) !important;
+  color:            var(--tblr-input-color) !important;
+}
+.form-control:focus, .form-select:focus {
+  border-color: var(--tblr-input-focus-border-color) !important;
+  box-shadow:   0 0 0 0.2rem rgba(0,212,232,0.2) !important;
+  background-color: var(--tblr-input-bg) !important;
+}
+.form-label { color: var(--tblr-muted); font-size: 0.8125rem; font-weight: 500; }
+
+/* ── Badges ─────────────────────────────────────────────────────────── */
+.badge { font-weight: 500; letter-spacing: 0.03em; }
+.badge.bg-primary { background-color: rgba(0,212,232,0.15) !important; color: var(--tblr-primary) !important; border: 1px solid rgba(0,212,232,0.3); }
+
+/* ── Tables ─────────────────────────────────────────────────────────── */
+.table { color: var(--tblr-body-color) !important; }
+.table > :not(caption) > * > * { background-color: transparent !important; }
+.table-hover > tbody > tr:hover > * { background-color: rgba(0,212,232,0.05) !important; }
+.table thead th { color: var(--tblr-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: .06em; border-color: var(--tblr-border-color) !important; }
+.table td, .table th { border-color: var(--tblr-border-color) !important; }
+
+/* ── Progress bars ──────────────────────────────────────────────────── */
+.progress { background-color: var(--tblr-bg-surface-tertiary) !important; }
+
+/* ── Scrollbar ──────────────────────────────────────────────────────── */
+::-webkit-scrollbar       { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--tblr-bg-surface); }
+::-webkit-scrollbar-thumb { background: var(--tblr-border-color); border-radius: 3px; }
+
+/* ── Scan-line medical overlay ──────────────────────────────────────── */
 body::before {
   content: '';
   pointer-events: none;
   position: fixed;
   inset: 0;
   background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(0, 212, 232, 0.012) 2px,
-    rgba(0, 212, 232, 0.012) 4px
+    0deg, transparent, transparent 2px,
+    rgba(0,212,232,0.008) 2px, rgba(0,212,232,0.008) 4px
   );
   z-index: 0;
 }
 
-/* Glow utilities */
+/* ── Keep LungTwin utility classes working ──────────────────────────── */
 .glow-cyan  { text-shadow: 0 0 12px rgba(0,212,232,.6); }
 .glow-teal  { text-shadow: 0 0 12px rgba(0,184,159,.6); }
 .glow-coral { text-shadow: 0 0 12px rgba(255,92,92,.6); }
-
-/* Ring glow for cards */
-.ring-glow-cyan  { box-shadow: 0 0 0 1px rgba(0,212,232,.4), 0 0 24px rgba(0,212,232,.08); }
-.ring-glow-teal  { box-shadow: 0 0 0 1px rgba(0,184,159,.4), 0 0 24px rgba(0,184,159,.08); }
-.ring-glow-coral { box-shadow: 0 0 0 1px rgba(255,92,92,.4), 0 0 24px rgba(255,92,92,.08); }
-
-/* Pulse dot */
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; transform: scale(1);   }
-  50%       { opacity: .4; transform: scale(.8); }
-}
+.ring-glow-cyan { box-shadow: 0 0 0 1px rgba(0,212,232,.4), 0 0 24px rgba(0,212,232,.08); }
+.ring-glow-teal { box-shadow: 0 0 0 1px rgba(0,184,159,.4), 0 0 24px rgba(0,184,159,.08); }
 .pulse-dot { animation: pulse-dot 1.6s ease-in-out infinite; }
-
-/* Progress bar fill */
-@keyframes bar-fill {
-  from { width: 0; }
-}
+@keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.8)} }
 .bar-animate { animation: bar-fill .9s cubic-bezier(.22,1,.36,1) forwards; }
-
-/* CT scan flicker entrance */
-@keyframes ct-flicker {
-  0%   { opacity: 0; filter: brightness(3); }
-  20%  { opacity: .7; filter: brightness(.6); }
-  40%  { opacity: .9; filter: brightness(1.2); }
-  100% { opacity: 1;  filter: brightness(1); }
-}
+@keyframes bar-fill { from{width:0} }
 .ct-flicker { animation: ct-flicker .5s ease-out forwards; }
-
-/* Slide-in from bottom */
-@keyframes slide-up {
-  from { transform: translateY(20px); opacity: 0; }
-  to   { transform: translateY(0);    opacity: 1; }
-}
+@keyframes ct-flicker { 0%{opacity:0;filter:brightness(3)} 20%{opacity:.7;filter:brightness(.6)} 40%{opacity:.9;filter:brightness(1.2)} 100%{opacity:1;filter:brightness(1)} }
 .slide-up { animation: slide-up .5s cubic-bezier(.22,1,.36,1) both; }
-
-.delay-100 { animation-delay: .1s; }
-.delay-200 { animation-delay: .2s; }
-.delay-300 { animation-delay: .3s; }
-.delay-400 { animation-delay: .4s; }
-.delay-500 { animation-delay: .5s; }
+@keyframes slide-up { from{transform:translateY(20px);opacity:0} to{transform:translateY(0);opacity:1} }
+.delay-100{animation-delay:.1s} .delay-200{animation-delay:.2s}
+.delay-300{animation-delay:.3s} .delay-400{animation-delay:.4s}

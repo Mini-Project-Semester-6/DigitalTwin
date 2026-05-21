@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { getModelInfo } from '../utils/api'
 import { Cpu, CheckCircle, AlertCircle } from 'lucide-react'
+import {
+  IconFlask, IconTrash, IconDownload, IconLoader2
+} from '@tabler/icons-react'
 
 export default function About() {
   const [info, setInfo] = useState(null)

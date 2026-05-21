@@ -1,347 +1,671 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { RotateCcw, Play, Pause, Layers } from 'lucide-react'
+import * as THREE from 'three'
+import { Layers, RotateCcw, Play, Pause } from 'lucide-react'
 
-const MODES = ['volume', 'mip', 'slice']
-const MODE_LABELS = { volume: 'Volume', mip: 'MIP', slice: 'Axial Slice' }
+// ── Transfer function presets ─────────────────────────────────────────────
+// Each preset defines colormap stops [value, r, g, b, alpha] in [0,1]
+const PRESETS = {
+  lung: {
+    label: 'Lung',
+    stops: [
+      [0.00, 0.00, 0.00, 0.00, 0.00],
+      [0.15, 0.05, 0.05, 0.08, 0.00],
+      [0.25, 0.10, 0.35, 0.55, 0.04],
+      [0.40, 0.20, 0.70, 0.65, 0.10],
+      [0.55, 0.55, 0.85, 0.55, 0.18],
+      [0.50, 0.55, 0.75, 0.92, 0.10],  // blue-white vessels
+      [0.85, 0.90, 0.95, 1.00, 0.24],  // bright structures
+      [1.00, 1.00, 1.00, 1.00, 0.35],
+    ],
+  },
+  bone: {
+    label: 'Bone',
+    stops: [
+      [0.00, 0.00, 0.00, 0.00, 0.00],
+      [0.50, 0.00, 0.00, 0.00, 0.00],
+      [0.65, 0.55, 0.38, 0.18, 0.08],
+      [0.80, 0.88, 0.78, 0.58, 0.45],
+      [1.00, 1.00, 0.98, 0.90, 0.80],
+    ],
+  },
+  mip: {
+    label: 'MIP',
+    stops: [
+      [0.00, 0.00, 0.20, 0.20, 0.00],
+      [0.12, 0.00, 0.20, 0.20, 0.00],
+      [0.15, 0.00, 0.65, 0.65, 0.35],
+      [0.55, 0.00, 0.90, 0.85, 0.65],
+      [1.00, 1.00, 1.00, 1.00, 1.00],
+    ],
+  },
+  pet: {
+    label: 'PET',
+    stops: [
+      [0.00, 0.00, 0.00, 0.00, 0.00],
+      [0.10, 0.00, 0.00, 0.00, 0.00],
+      [0.20, 0.50, 0.00, 0.00, 0.08],
+      [0.50, 1.00, 0.50, 0.00, 0.30],
+      [0.80, 1.00, 1.00, 0.00, 0.55],
+      [1.00, 1.00, 1.00, 1.00, 0.85],
+    ],
+  },
+}
 
-export default function CTViewer3D({ volumeSlices }) {
-  const canvasRef   = useRef(null)
-  const stateRef    = useRef({
-    rotX: -0.4, rotY: 0.3, zoom: 1.0,
-    brightness: 1.2, contrast: 1.4,
-    threshold: 0.18, sliceZ: 0.5,
-    mode: 'volume', dragging: false,
-    lastX: 0, lastY: 0, autoRotate: false,
-    rafId: null, renderPending: false,
-  })
-  const volumeRef   = useRef(null)
-  const [mode,      setModeState]  = useState('volume')
-  const [autoRot,   setAutoRot]    = useState(false)
-  const [rotXDisp,  setRotXDisp]   = useState('-22.9°')
-  const [rotYDisp,  setRotYDisp]   = useState('17.2°')
-  const [zoomDisp,  setZoomDisp]   = useState('1.00×')
-  const [sliceDisp, setSliceDisp]  = useState('32')
+// Interpolate a transfer function at value v → [r,g,b,a]
+function sampleTF(stops, v) {
+  for (let i = 1; i < stops.length; i++) {
+    const [v0, r0, g0, b0, a0] = stops[i - 1]
+    const [v1, r1, g1, b1, a1] = stops[i]
+    if (v <= v1) {
+      const t = (v - v0) / (v1 - v0 + 1e-8)
+      return [
+        r0 + (r1 - r0) * t,
+        g0 + (g1 - g0) * t,
+        b0 + (b1 - b0) * t,
+        a0 + (a1 - a0) * t,
+      ]
+    }
+  }
+  const last = stops[stops.length - 1]
+  return [last[1], last[2], last[3], last[4]]
+}
 
-  // Build Float32 3D volume from base64 PNG slice array
-  useEffect(() => {
-    if (!volumeSlices?.length) return
-    const n   = volumeSlices.length
-    const S   = 128
-    const vol = new Float32Array(n * S * S)
+// Build RGBA transfer function texture (256 x 1)
+function buildTFTexture(presetKey) {
+  const stops = PRESETS[presetKey].stops
+  const data = new Uint8Array(256 * 4)
+  for (let i = 0; i < 256; i++) {
+    const [r, g, b, a] = sampleTF(stops, i / 255)
+    data[i * 4 + 0] = Math.round(r * 255)
+    data[i * 4 + 1] = Math.round(g * 255)
+    data[i * 4 + 2] = Math.round(b * 255)
+    data[i * 4 + 3] = Math.round(a * 255)
+  }
+  const tex = new THREE.DataTexture(data, 256, 1, THREE.RGBAFormat, THREE.UnsignedByteType)
+  tex.needsUpdate = true
+  return tex
+}
 
-    let loaded = 0
-    volumeSlices.forEach((b64, zi) => {
-      const img    = new Image()
-      img.onload   = () => {
-        const tmp  = document.createElement('canvas')
-        tmp.width  = S; tmp.height = S
-        const ctx  = tmp.getContext('2d')
-        ctx.drawImage(img, 0, 0, S, S)
-        const px   = ctx.getImageData(0, 0, S, S).data
-        for (let y = 0; y < S; y++)
-          for (let x = 0; x < S; x++)
-            vol[zi * S * S + y * S + x] = px[(y * S + x) * 4] / 255
-        if (++loaded === n) { volumeRef.current = { data: vol, W: S, H: S, D: n }; schedRender() }
+// ── GLSL volume shader ────────────────────────────────────────────────────
+const vertShader = /* glsl */`
+  varying vec3 vOrigin;
+  varying vec3 vDirection;
+
+  void main() {
+    vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+    vOrigin    = (inverse(modelMatrix) * vec4(cameraPosition, 1.0)).xyz + 0.5;
+    vDirection = position - vOrigin + 0.5;
+    gl_Position = projectionMatrix * mvPos;
+  }
+`
+
+const fragShader = /* glsl */`
+  precision highp float;
+  precision highp sampler3D;
+
+  uniform sampler3D uVolume;
+  uniform sampler2D uTransferFunc;
+  uniform float     uThreshold;
+  uniform float     uOpacityScale;
+  uniform float     uBrightness;
+  uniform int       uSteps;
+
+  varying vec3 vOrigin;
+  varying vec3 vDirection;
+
+  // Ray–AABB intersection (unit cube [0,1]³)
+  vec2 hitBox(vec3 orig, vec3 dir) {
+    vec3 tMin = (vec3(0.0) - orig) / dir;
+    vec3 tMax = (vec3(1.0) - orig) / dir;
+    vec3 t1   = min(tMin, tMax);
+    vec3 t2   = max(tMin, tMax);
+    float tN  = max(max(t1.x, t1.y), t1.z);
+    float tF  = min(min(t2.x, t2.y), t2.z);
+    return vec2(tN, tF);
+  }
+
+  void main() {
+    vec3 rayDir = normalize(vDirection);
+    vec2 bounds = hitBox(vOrigin, rayDir);
+
+    if (bounds.x >= bounds.y) discard;
+    bounds.x = max(bounds.x, 0.0);
+
+    float stepSize = (bounds.y - bounds.x) / float(uSteps);
+    vec3  pos      = vOrigin + bounds.x * rayDir;
+    vec4  accum    = vec4(0.0);
+
+    for (int i = 0; i < 512; i++) {
+      if (i >= uSteps) break;
+
+      float density = texture(uVolume, pos).r;
+
+      if (density > uThreshold) {
+        vec4 tfSample = texture2D(uTransferFunc, vec2(density, 0.5));
+        tfSample.a   *= uOpacityScale * stepSize * 200.0;
+        tfSample.rgb *= uBrightness;
+
+        // Front-to-back alpha compositing
+        accum.rgb += (1.0 - accum.a) * tfSample.a * tfSample.rgb;
+        accum.a   += (1.0 - accum.a) * tfSample.a;
       }
-      img.src = `data:image/png;base64,${b64}`
+
+      pos += rayDir * stepSize;
+      if (pos.x < 0.0 || pos.x > 1.0 ||
+          pos.y < 0.0 || pos.y > 1.0 ||
+          pos.z < 0.0 || pos.z > 1.0) break;
+      if (accum.a >= 0.98) break;
+    }
+
+    if (accum.a < 0.01) discard;
+    gl_FragColor = accum;
+  }
+`
+
+// ── MPR slice shader (axial / coronal / sagittal) ─────────────────────────
+const sliceVertShader = /* glsl */`
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`
+const sliceFragShader = /* glsl */`
+  precision highp float;
+  precision highp sampler3D;
+
+  uniform sampler3D uVolume;
+  uniform float     uSlice;
+  uniform int       uAxis;       // 0=axial(Z) 1=coronal(Y) 2=sagittal(X)
+  uniform float     uWL;
+  uniform float     uWW;
+
+  varying vec2 vUv;
+
+  void main() {
+    vec3 coords;
+    if      (uAxis == 0) coords = vec3(vUv.x, vUv.y, uSlice);
+    else if (uAxis == 1) coords = vec3(vUv.x, uSlice, vUv.y);
+    else                 coords = vec3(uSlice, vUv.x, vUv.y);
+
+    float density = texture(uVolume, coords).r;
+
+    // Window / level
+    float lo  = uWL - uWW * 0.5;
+    float hi  = uWL + uWW * 0.5;
+    float val = clamp((density - lo) / (hi - lo + 1e-6), 0.0, 1.0);
+
+    gl_FragColor = vec4(vec3(val), 1.0);
+  }
+`
+
+// ═══════════════════════════════════════════════════════════════════════════
+export default function CTViewer3D({ volumeData }) {
+  const mountRef = useRef(null)
+  const threeCtx = useRef(null)
+  const rafRef = useRef(null)
+
+  const [preset, setPreset] = useState('lung')
+  const [viewMode, setViewMode] = useState('3d')
+  const [autoRotate, setAutoRotate] = useState(false)
+  const [threshold, setThreshold] = useState(0.15)
+  const [opacity, setOpacity] = useState(1.0)
+  const [brightness, setBrightness] = useState(1.2)
+  const [steps, setSteps] = useState(200)
+  const [sliceZ, setSliceZ] = useState(0.5)
+  const [sliceY, setSliceY] = useState(0.5)
+  const [sliceX, setSliceX] = useState(0.5)
+  const [wl, setWl] = useState(0.5)
+  const [ww, setWw] = useState(0.8)
+  const [ready, setReady] = useState(false)
+  const [dims, setDims] = useState([64, 128, 128])
+
+  // ── Decode base64 float32 → 3D texture ──────────────────────────────────
+  const buildVolumeTexture = useCallback((vd) => {
+    if (!vd?.voxels_b64) return null
+    const bin = atob(vd.voxels_b64)
+    const buf = new ArrayBuffer(bin.length)
+    const u8 = new Uint8Array(buf)
+    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i)
+    const f32 = new Float32Array(buf)
+
+    const [D, H, W] = vd.dims
+    // Convert float32 → Uint8 for DataTexture3D
+    const u8vol = new Uint8Array(f32.length)
+    for (let i = 0; i < f32.length; i++) {
+      u8vol[i] = Math.round(Math.min(1, Math.max(0, f32[i])) * 255)
+    }
+
+    const tex = new THREE.Data3DTexture(u8vol, W, H, D)
+    tex.format = THREE.RedFormat
+    tex.type = THREE.UnsignedByteType
+    tex.minFilter = THREE.LinearFilter
+    tex.magFilter = THREE.LinearFilter
+    tex.wrapS = THREE.ClampToEdgeWrapping
+    tex.wrapT = THREE.ClampToEdgeWrapping
+    tex.wrapR = THREE.ClampToEdgeWrapping
+    tex.unpackAlignment = 1
+    tex.needsUpdate = true
+    return tex
+  }, [])
+
+  // ── Initialise Three.js scene ────────────────────────────────────────────
+  useEffect(() => {
+    if (!mountRef.current || !volumeData?.voxels_b64) return
+
+    // Cleanup previous
+    if (threeCtx.current) {
+      cancelAnimationFrame(rafRef.current)
+      threeCtx.current.renderer.dispose()
+      threeCtx.current = null
+    }
+
+    const W = mountRef.current.clientWidth || 620
+    const H = mountRef.current.clientHeight || 380
+
+    // Renderer
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
+    renderer.setSize(W, H)
+    renderer.setPixelRatio(window.devicePixelRatio)
+    renderer.setClearColor(0x0A1628, 1)
+    mountRef.current.appendChild(renderer.domElement)
+
+    // Scene + camera
+    const scene = new THREE.Scene()
+    const camera = new THREE.PerspectiveCamera(45, W / H, 0.01, 100)
+    camera.position.set(0, 0, 2.2)
+
+    // Build volume texture
+    const volTex = buildVolumeTexture(volumeData)
+    if (!volTex) return
+    const [D, H2, W2] = volumeData.dims
+    setDims([D, H2, W2])
+
+    // Transfer function texture
+    const tfTex = buildTFTexture('lung')
+
+    // Volume mesh — unit cube centred at origin
+    const geometry = new THREE.BoxGeometry(1, 1, 1)
+
+    const volMaterial = new THREE.ShaderMaterial({
+      vertexShader: vertShader,
+      fragmentShader: fragShader,
+      uniforms: {
+        uVolume: { value: volTex },
+        uTransferFunc: { value: tfTex },
+        uThreshold: { value: 0.15 },
+        uOpacityScale: { value: 1.0 },
+        uBrightness: { value: 1.2 },
+        uSteps: { value: 200 },
+      },
+      side: THREE.BackSide,
+      transparent: true,
+      depthWrite: false,
     })
-  }, [volumeSlices])
 
-  function sampleVol(vx, vy, vz) {
-    const v = volumeRef.current
-    if (!v) return 0
-    const xi = Math.max(0, Math.min(v.W - 1, Math.round(vx * (v.W - 1))))
-    const yi = Math.max(0, Math.min(v.H - 1, Math.round(vy * (v.H - 1))))
-    const zi = Math.max(0, Math.min(v.D - 1, Math.round(vz * (v.D - 1))))
-    return v.data[zi * v.W * v.H + yi * v.W + xi]
-  }
+    const volMesh = new THREE.Mesh(geometry, volMaterial)
+    scene.add(volMesh)
 
-  const colorize = useCallback((val, m, brightness, contrast, threshold) => {
-    const v = Math.min(1, Math.max(0, (val - 0.5) * contrast + 0.5) * brightness)
-    if (m === 'mip') return [v * 0.3, v * 0.9, v, 1]
-    if (v < 0.15) return [v * 0.2, v * 0.4, v * 0.6, v * 0.3]
-    if (v < 0.4)  return [v * 0.6, v * 0.85, v, v * 0.6]
-    if (v < 0.7)  return [v * 0.9, v * 0.6, v * 0.3, v * 0.8]
-    return [1, v * 0.95, v * 0.85, v]
-  }, [])
+    // MPR slice planes
+    const makePlane = (axis) => {
+      const geo = new THREE.PlaneGeometry(1, 1)
+      const mat = new THREE.ShaderMaterial({
+        vertexShader: sliceVertShader,
+        fragmentShader: sliceFragShader,
+        uniforms: {
+          uVolume: { value: volTex },
+          uSlice: { value: 0.5 },
+          uAxis: { value: axis },
+          uWL: { value: 0.5 },
+          uWW: { value: 0.8 },
+        },
+        // side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.9,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      })
+      const mesh = new THREE.Mesh(geo, mat)
+      mesh.visible = false
+      return mesh
+    }
+    const axialPlane = makePlane(0)
+    const coronalPlane = makePlane(1)
+    axialPlane.rotation.x = -Math.PI / 2
+    const sagittalPlane = makePlane(2)
+    sagittalPlane.rotation.y = Math.PI / 2
+    scene.add(axialPlane, coronalPlane, sagittalPlane)
+    axialPlane.renderOrder = 1
+    coronalPlane.renderOrder = 2
+    sagittalPlane.renderOrder = 3
 
-  function applyRot(rx, ry, v) {
-    const cx = Math.cos(rx), sx = Math.sin(rx)
-    const cy = Math.cos(ry), sy = Math.sin(ry)
-    const [x, y, z] = v
-    const y2 = y * cx - z * sx, z2 = y * sx + z * cx
-    return [x * cy + z2 * sy, y2, -x * sy + z2 * cy]
-  }
+    // Mouse orbit
+    let isDragging = false, lastX = 0, lastY = 0
+    const onDown = (e) => { isDragging = true; lastX = e.clientX; lastY = e.clientY }
+    const onUp = () => { isDragging = false }
+    const onMove = (e) => {
+      if (!isDragging) return
+      const dx = e.clientX - lastX, dy = e.clientY - lastY
+      volMesh.rotation.y += dx * 0.008
+      volMesh.rotation.x += dy * 0.008
+      lastX = e.clientX; lastY = e.clientY
+    }
+    const onWheel = (e) => {
+      e.preventDefault()
+      camera.position.z = Math.max(0.5, Math.min(5, camera.position.z + e.deltaY * 0.001))
+    }
+    const el = renderer.domElement
+    el.addEventListener('mousedown', onDown)
+    el.addEventListener('touchstart', (e) => { isDragging = true; lastX = e.touches[0].clientX; lastY = e.touches[0].clientY }, { passive: true })
+    el.addEventListener('touchend', () => isDragging = false)
+    el.addEventListener('touchmove', (e) => { onMove({ clientX: e.touches[0].clientX, clientY: e.touches[0].clientY }) }, { passive: true })
+    window.addEventListener('mouseup', onUp)
+    window.addEventListener('mousemove', onMove)
+    el.addEventListener('wheel', onWheel, { passive: false })
 
-  const render = useCallback(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const s = stateRef.current
-    const W = canvas.width, H = canvas.height
-    const img = new ImageData(W, H)
-    const pix = img.data
-    const { rotX, rotY, zoom, brightness, contrast, threshold, sliceZ, mode: m } = s
-    const steps = m === 'mip' ? 80 : 64
+    // Render loop
+    const animate = () => {
+      rafRef.current = requestAnimationFrame(animate)
+      renderer.render(scene, camera)
+    }
+    animate()
+    setReady(true)
 
-    for (let py = 0; py < H; py++) {
-      for (let px = 0; px < W; px++) {
-        const ndcX = (px / W - 0.5) * 2 / zoom
-        const ndcY = (py / H - 0.5) * 2 / zoom * (H / W)
-        const rd0  = applyRot(rotX, rotY, [ndcX * 0.6, -ndcY * 0.6, 1])
-        const len  = Math.sqrt(rd0[0] ** 2 + rd0[1] ** 2 + rd0[2] ** 2)
-        const rd   = [rd0[0] / len, rd0[1] / len, rd0[2] / len]
-        const ro   = applyRot(rotX, rotY, [ndcX * 1.3, -ndcY * 1.3, -2.2])
-
-        let accR = 0, accG = 0, accB = 0, accA = 0, maxVal = 0
-
-        for (let si = 0; si < steps; si++) {
-          const t  = si / steps * 3.0
-          const wx = ro[0] + rd[0] * t
-          const wy = ro[1] + rd[1] * t
-          const wz = ro[2] + rd[2] * t
-          const vx = (wx + 1) * 0.5, vy = (wy + 1) * 0.5, vz = (wz + 1) * 0.5
-          if (vx < 0 || vx > 1 || vy < 0 || vy > 1 || vz < 0 || vz > 1) continue
-
-          if (m === 'slice') {
-            if (Math.abs(vz - sliceZ) < 0.016) {
-              const val = sampleVol(vx, vy, sliceZ)
-              const c = colorize(val, 'volume', brightness, contrast, threshold)
-              accR = c[0] * 255; accG = c[1] * 255; accB = c[2] * 255; accA = 255
-            }
-            continue
-          }
-
-          const val = sampleVol(vx, vy, vz)
-          if (val < threshold) continue
-          if (m === 'mip') { if (val > maxVal) maxVal = val; continue }
-
-          const c = colorize(val, 'volume', brightness, contrast, threshold)
-          const alpha = c[3] * 0.18
-          accR += (c[0] * 255 - accR) * alpha
-          accG += (c[1] * 255 - accG) * alpha
-          accB += (c[2] * 255 - accB) * alpha
-          accA = Math.min(255, accA + alpha * 255)
-        }
-
-        if (m === 'mip' && maxVal > threshold) {
-          const c = colorize(maxVal, 'mip', brightness, contrast, threshold)
-          accR = c[0] * 255; accG = c[1] * 255; accB = c[2] * 255; accA = c[3] * 255
-        }
-
-        const idx = (py * W + px) * 4
-        pix[idx]     = Math.min(255, accR | 0)
-        pix[idx + 1] = Math.min(255, accG | 0)
-        pix[idx + 2] = Math.min(255, accB | 0)
-        pix[idx + 3] = Math.min(255, accA | 0)
+    threeCtx.current = {
+      renderer, scene, camera,
+      volMesh, volMaterial, volTex, tfTex,
+      axialPlane, coronalPlane, sagittalPlane,
+      cleanup: () => {
+        window.removeEventListener('mouseup', onUp)
+        window.removeEventListener('mousemove', onMove)
+        el.removeEventListener('mousedown', onDown)
+        el.removeEventListener('wheel', onWheel)
       }
     }
 
-    const ctx = canvas.getContext('2d')
-    ctx.fillStyle = '#000'
-    ctx.fillRect(0, 0, W, H)
-    ctx.putImageData(img, 0, 0)
-
-    // Overlay text
-    ctx.font = '11px monospace'
-    ctx.fillStyle = 'rgba(0,212,200,0.75)'
-    ctx.fillText(MODE_LABELS[m], 10, 18)
-    ctx.fillStyle = 'rgba(0,180,160,0.5)'
-    ctx.fillText(`Rx ${(s.rotX * 57.3).toFixed(1)}° Ry ${(s.rotY * 57.3).toFixed(1)}° Z ${s.zoom.toFixed(2)}×`, 10, 32)
-
-    // Update display state
-    setRotXDisp((s.rotX * 57.3).toFixed(1) + '°')
-    setRotYDisp((s.rotY * 57.3).toFixed(1) + '°')
-    setZoomDisp(s.zoom.toFixed(2) + '×')
-    setSliceDisp(Math.round(s.sliceZ * (volumeRef.current?.D ?? 64)))
-  }, [colorize, sampleVol])
-
-  function schedRender() {
-    const s = stateRef.current
-    if (s.renderPending) return
-    s.renderPending = true
-    requestAnimationFrame(() => { render(); s.renderPending = false })
-  }
-
-  // Mouse / touch
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const s = stateRef.current
-
-    const onDown  = e => { s.dragging = true; s.lastX = e.clientX; s.lastY = e.clientY }
-    const onUp    = () => { s.dragging = false }
-    const onMove  = e => {
-      if (!s.dragging) return
-      s.rotY += (e.clientX - s.lastX) * 0.008
-      s.rotX += (e.clientY - s.lastY) * 0.008
-      s.lastX = e.clientX; s.lastY = e.clientY
-      schedRender()
-    }
-    const onWheel = e => {
-      e.preventDefault()
-      s.zoom = Math.max(0.3, Math.min(4, s.zoom - e.deltaY * 0.001))
-      schedRender()
-    }
-    const onTDown = e => { s.dragging = true; s.lastX = e.touches[0].clientX; s.lastY = e.touches[0].clientY }
-    const onTMove = e => {
-      e.preventDefault()
-      s.rotY += (e.touches[0].clientX - s.lastX) * 0.008
-      s.rotX += (e.touches[0].clientY - s.lastY) * 0.008
-      s.lastX = e.touches[0].clientX; s.lastY = e.touches[0].clientY
-      schedRender()
-    }
-
-    canvas.addEventListener('mousedown',  onDown)
-    canvas.addEventListener('touchstart', onTDown)
-    canvas.addEventListener('touchmove',  onTMove, { passive: false })
-    canvas.addEventListener('wheel',      onWheel, { passive: false })
-    window.addEventListener('mouseup',    onUp)
-    window.addEventListener('mousemove',  onMove)
-
-    schedRender()
     return () => {
-      canvas.removeEventListener('mousedown',  onDown)
-      canvas.removeEventListener('touchstart', onTDown)
-      canvas.removeEventListener('touchmove',  onTMove)
-      canvas.removeEventListener('wheel',      onWheel)
-      window.removeEventListener('mouseup',    onUp)
-      window.removeEventListener('mousemove',  onMove)
-    }
-  }, [])
-
-  function setMode(m) {
-    stateRef.current.mode = m
-    setModeState(m)
-    schedRender()
-  }
-
-  function resetView() {
-    Object.assign(stateRef.current, { rotX: -0.4, rotY: 0.3, zoom: 1.0 })
-    schedRender()
-  }
-
-  function toggleAuto() {
-    const s = stateRef.current
-    s.autoRotate = !s.autoRotate
-    setAutoRot(s.autoRotate)
-    if (s.autoRotate) {
-      const loop = () => {
-        if (!stateRef.current.autoRotate) return
-        stateRef.current.rotY += 0.012
-        schedRender()
-        s.rafId = requestAnimationFrame(loop)
+      cancelAnimationFrame(rafRef.current)
+      threeCtx.current?.cleanup()
+      if (mountRef.current && renderer.domElement.parentNode === mountRef.current) {
+        mountRef.current.removeChild(renderer.domElement)
       }
-      loop()
-    } else {
-      cancelAnimationFrame(s.rafId)
+      renderer.dispose()
+      volTex.dispose()
+      tfTex.dispose()
+      threeCtx.current = null
+      setReady(false)
     }
+  }, [volumeData])
+
+  // ── Preset → rebuild transfer function texture ───────────────────────────
+  useEffect(() => {
+    const ctx = threeCtx.current
+    if (!ctx) return
+    ctx.tfTex.dispose()
+    const newTex = buildTFTexture(preset)
+    ctx.tfTex = newTex
+    ctx.volMaterial.uniforms.uTransferFunc.value = newTex
+  }, [preset])
+
+  // ── Uniform updates ──────────────────────────────────────────────────────
+  useEffect(() => {
+    const u = threeCtx.current?.volMaterial?.uniforms
+    if (u) u.uThreshold.value = threshold
+  }, [threshold])
+
+  useEffect(() => {
+    const u = threeCtx.current?.volMaterial?.uniforms
+    if (u) u.uOpacityScale.value = opacity
+  }, [opacity])
+
+  useEffect(() => {
+    const u = threeCtx.current?.volMaterial?.uniforms
+    if (u) u.uBrightness.value = brightness
+  }, [brightness])
+
+  useEffect(() => {
+    const u = threeCtx.current?.volMaterial?.uniforms
+    if (u) u.uSteps.value = steps
+  }, [steps])
+
+  // ── View mode ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const ctx = threeCtx.current
+    if (!ctx) return
+    const is3D = viewMode === '3d'
+    ctx.volMesh.visible = is3D
+    ctx.axialPlane.visible = viewMode === 'axial'
+    ctx.coronalPlane.visible = viewMode === 'coronal'
+    ctx.sagittalPlane.visible = viewMode === 'sagittal'
+  }, [viewMode])
+
+  // ── Slice position ───────────────────────────────────────────────────────
+  useEffect(() => {
+    const ctx = threeCtx.current
+    if (!ctx) return
+    ctx.axialPlane.material.uniforms.uSlice.value = sliceZ
+    ctx.axialPlane.position.y = sliceZ - 0.5
+  }, [sliceZ])
+
+  useEffect(() => {
+    const ctx = threeCtx.current
+    if (!ctx) return
+    ctx.coronalPlane.material.uniforms.uSlice.value = sliceY
+    ctx.coronalPlane.position.z = sliceY - 0.5
+  }, [sliceY])
+
+  useEffect(() => {
+    const ctx = threeCtx.current
+    if (!ctx) return
+    ctx.sagittalPlane.material.uniforms.uSlice.value = sliceX
+    ctx.sagittalPlane.position.x = sliceX - 0.5
+  }, [sliceX])
+
+  // ── Window/Level ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    const ctx = threeCtx.current
+    if (!ctx) return
+      ;[ctx.axialPlane, ctx.coronalPlane, ctx.sagittalPlane].forEach(p => {
+        p.material.uniforms.uWL.value = wl
+        p.material.uniforms.uWW.value = ww
+      })
+  }, [wl, ww])
+
+  // ── Auto-rotate ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    const ctx = threeCtx.current
+    if (!ctx || !autoRotate) return
+    const spin = () => { ctx.volMesh.rotation.y += 0.006 }
+    const id = setInterval(spin, 16)
+    return () => clearInterval(id)
+  }, [autoRotate])
+
+  const resetCamera = () => {
+    const ctx = threeCtx.current
+    if (!ctx) return
+    ctx.volMesh.rotation.set(0, 0, 0)
+    ctx.camera.position.set(0, 0, 2.2)
   }
 
-  function handleSlider(key, val, transform) {
-    stateRef.current[key] = transform ? transform(val) : val
-    schedRender()
-  }
+  const VIEW_MODES = ['3d', 'axial', 'coronal', 'sagittal']
 
-  const sliceCount = volumeRef.current?.D ?? volumeSlices?.length ?? 64
+  if (!volumeData?.voxels_b64) return null
 
   return (
-    <div className="rounded-2xl p-6 space-y-4"
-         style={{ background: 'var(--card)', border: '1px solid var(--rim)' }}>
+    <div className="rounded-2xl overflow-hidden"
+      style={{ background: 'var(--card)', border: '1px solid var(--rim)' }}>
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between px-5 py-3"
+        style={{ background: 'var(--panel)', borderBottom: '1px solid var(--rim)' }}>
         <div className="flex items-center gap-2">
-          <Layers size={18} style={{ color: 'var(--cyan)' }} />
-          <h3 className="font-display font-600 text-base">3D CT Reconstruction</h3>
+          <Layers size={16} style={{ color: 'var(--cyan)' }} />
+          <span className="font-display font-600 text-sm" style={{ color: 'var(--cyan)' }}>
+            3D Volume Viewer
+          </span>
+          <span className="text-xs font-mono px-2 py-0.5 rounded"
+            style={{ background: 'rgba(0,212,232,0.12)', color: 'var(--cyan)' }}>
+            Three.js WebGL
+          </span>
+          {ready && (
+            <span className="text-xs font-mono opacity-40">
+              {dims[2]}×{dims[1]}×{dims[0]}
+            </span>
+          )}
         </div>
-        <div className="flex gap-2 text-xs font-mono">
-          {MODES.map(m => (
-            <button key={m} onClick={() => setMode(m)}
-                    className="px-3 py-1 rounded-lg transition-all"
-                    style={{
-                      background: mode === m ? 'rgba(0,212,232,0.15)' : 'var(--panel)',
-                      border:     `1px solid ${mode === m ? 'var(--cyan)' : 'var(--rim)'}`,
-                      color:      mode === m ? 'var(--cyan)' : '#7a94b0',
-                    }}>
-              {MODE_LABELS[m]}
+        <div className="flex gap-1.5">
+          <button onClick={resetCamera}
+            className="p-1.5 rounded-lg"
+            style={{ background: 'var(--card)', border: '1px solid var(--rim)' }}
+            title="Reset">
+            <RotateCcw size={13} style={{ color: 'var(--teal)' }} />
+          </button>
+          <button onClick={() => setAutoRotate(r => !r)}
+            className="p-1.5 rounded-lg"
+            style={{
+              background: autoRotate ? 'rgba(0,212,232,0.15)' : 'var(--card)',
+              border: `1px solid ${autoRotate ? 'var(--cyan)' : 'var(--rim)'}`,
+            }}>
+            {autoRotate
+              ? <Pause size={13} style={{ color: 'var(--cyan)' }} />
+              : <Play size={13} style={{ color: 'var(--cyan)' }} />
+            }
+          </button>
+        </div>
+      </div>
+
+      {/* View mode + preset tabs */}
+      <div className="flex flex-wrap items-center gap-1 px-4 pt-3">
+        {VIEW_MODES.map(m => (
+          <button key={m}
+            onClick={() => setViewMode(m)}
+            className="px-3 py-1 rounded-lg text-xs font-mono transition-all"
+            style={{
+              background: viewMode === m ? 'rgba(0,212,232,0.15)' : 'var(--panel)',
+              border: `1px solid ${viewMode === m ? 'var(--cyan)' : 'var(--rim)'}`,
+              color: viewMode === m ? 'var(--cyan)' : 'var(--slate)',
+              textTransform: 'capitalize',
+            }}>
+            {m === '3d' ? '3D Volume' : m.charAt(0).toUpperCase() + m.slice(1)}
+          </button>
+        ))}
+        <div className="ml-auto flex gap-1 flex-wrap">
+          {Object.entries(PRESETS).map(([key, { label }]) => (
+            <button key={key}
+              onClick={() => setPreset(key)}
+              className="px-3 py-1 rounded-lg text-xs font-mono transition-all"
+              style={{
+                background: preset === key ? 'rgba(155,138,255,0.15)' : 'var(--panel)',
+                border: `1px solid ${preset === key ? 'var(--lavender)' : 'var(--rim)'}`,
+                color: preset === key ? 'var(--lavender)' : 'var(--slate)',
+              }}>
+              {label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Canvas */}
-      <div className="relative rounded-xl overflow-hidden"
-           style={{ background: '#000', border: '1px solid rgba(0,212,232,0.2)' }}>
-        <canvas ref={canvasRef} width={620} height={340}
-                style={{ display: 'block', width: '100%', cursor: 'grab' }} />
-        <div className="absolute bottom-2 right-3 text-xs font-mono opacity-40"
-             style={{ color: 'var(--cyan)' }}>
-          drag · scroll · pinch
-        </div>
-      </div>
-
-      {/* Metrics */}
-      <div className="grid grid-cols-4 gap-2">
-        {[['Rotation X', rotXDisp], ['Rotation Y', rotYDisp],
-          ['Zoom',       zoomDisp], ['Slice',      sliceDisp]].map(([label, val]) => (
-          <div key={label} className="p-3 rounded-xl text-center"
-               style={{ background: 'var(--panel)', border: '1px solid var(--rim)' }}>
-            <p className="text-xs font-mono opacity-40 mb-1">{label}</p>
-            <p className="font-display font-600 text-base" style={{ color: 'var(--cyan)' }}>{val}</p>
+      {/* Canvas mount */}
+      <div className="relative mx-4 mt-3 rounded-xl overflow-hidden"
+        style={{ height: 380, background: '#0A1628' }}>
+        <div ref={mountRef} style={{ width: '100%', height: '100%' }} />
+        {!ready && (
+          <div className="absolute inset-0 flex items-center justify-center"
+            style={{ background: 'rgba(10,22,40,0.9)' }}>
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-10 h-10 rounded-full border-4 border-transparent animate-spin"
+                style={{ borderTopColor: 'var(--cyan)' }} />
+              <span className="text-xs font-mono" style={{ color: 'var(--cyan)' }}>
+                Building 3D volume…
+              </span>
+            </div>
           </div>
-        ))}
-      </div>
-
-      {/* Sliders */}
-      <div className="space-y-3">
-        {[
-          { label: 'Brightness', key: 'brightness', min: 0.2, max: 3,   step: 0.05, def: 1.2 },
-          { label: 'Contrast',   key: 'contrast',   min: 0.2, max: 3,   step: 0.05, def: 1.4 },
-          { label: 'Threshold',  key: 'threshold',  min: 0,   max: 0.9, step: 0.01, def: 0.18 },
-        ].map(({ label, key, min, max, step, def }) => (
-          <div key={key} className="flex items-center gap-3">
-            <span className="text-xs font-mono opacity-50 w-20 shrink-0">{label}</span>
-            <input type="range" min={min} max={max} step={step} defaultValue={def}
-                   className="flex-1"
-                   onChange={e => handleSlider(key, parseFloat(e.target.value))} />
-            <span className="text-xs font-mono w-10 text-right"
-                  style={{ color: 'var(--cyan)' }}>
-              {def.toFixed(2)}
-            </span>
-          </div>
-        ))}
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-mono opacity-50 w-20 shrink-0">Slice Z</span>
-          <input type="range" min={0} max={sliceCount - 1} step={1}
-                 defaultValue={Math.round(sliceCount / 2)} className="flex-1"
-                 onChange={e => handleSlider('sliceZ', parseInt(e.target.value),
-                                             v => v / (sliceCount - 1))} />
-          <span className="text-xs font-mono w-10 text-right"
-                style={{ color: 'var(--cyan)' }}>{sliceDisp}</span>
-        </div>
+        )}
       </div>
 
       {/* Controls */}
-      <div className="flex gap-3">
-        <button onClick={resetView}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-mono transition-all"
-                style={{ background: 'var(--panel)', border: '1px solid var(--rim)',
-                         color: '#7a94b0' }}>
-          <RotateCcw size={13} /> Reset
-        </button>
-        <button onClick={toggleAuto}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-mono transition-all"
-                style={{
-                  background: autoRot ? 'rgba(0,212,232,0.12)' : 'var(--panel)',
-                  border:     `1px solid ${autoRot ? 'var(--cyan)' : 'var(--rim)'}`,
-                  color:      autoRot ? 'var(--cyan)' : '#7a94b0',
-                }}>
-          {autoRot ? <Pause size={13} /> : <Play size={13} />}
-          {autoRot ? 'Stop' : 'Auto-rotate'}
-        </button>
-        <span className="ml-auto text-xs font-mono opacity-40 self-center">
-          {sliceCount} slices · 128³ reconstructed
-        </span>
+      <div className="px-4 pb-4 pt-3 space-y-2">
+
+        {/* Slice sliders */}
+        {viewMode === 'axial' && (
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-mono opacity-50 w-20 shrink-0">Axial Z</span>
+            <input type="range" min={0} max={1} step={0.005} value={sliceZ}
+              onChange={e => setSliceZ(+e.target.value)} className="flex-1" />
+            <span className="text-xs font-mono w-12 text-right"
+              style={{ color: 'var(--cyan)' }}>
+              {Math.round(sliceZ * dims[0])} / {dims[0]}
+            </span>
+          </div>
+        )}
+        {viewMode === 'coronal' && (
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-mono opacity-50 w-20 shrink-0">Coronal Y</span>
+            <input type="range" min={0} max={1} step={0.005} value={sliceY}
+              onChange={e => setSliceY(+e.target.value)} className="flex-1" />
+            <span className="text-xs font-mono w-12 text-right"
+              style={{ color: 'var(--lavender)' }}>
+              {Math.round(sliceY * dims[1])} / {dims[1]}
+            </span>
+          </div>
+        )}
+        {viewMode === 'sagittal' && (
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-mono opacity-50 w-20 shrink-0">Sagittal X</span>
+            <input type="range" min={0} max={1} step={0.005} value={sliceX}
+              onChange={e => setSliceX(+e.target.value)} className="flex-1" />
+            <span className="text-xs font-mono w-12 text-right"
+              style={{ color: 'var(--amber)' }}>
+              {Math.round(sliceX * dims[2])} / {dims[2]}
+            </span>
+          </div>
+        )}
+
+        {/* Window / Level for slice modes */}
+        {viewMode !== '3d' && (
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono opacity-50 w-16 shrink-0">W Level</span>
+              <input type="range" min={0} max={1} step={0.01} value={wl}
+                onChange={e => setWl(+e.target.value)} className="flex-1" />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono opacity-50 w-16 shrink-0">W Width</span>
+              <input type="range" min={0.05} max={1} step={0.01} value={ww}
+                onChange={e => setWw(+e.target.value)} className="flex-1" />
+            </div>
+          </div>
+        )}
+
+        {/* Volume controls */}
+        {viewMode === '3d' && (
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono opacity-50 w-16 shrink-0">Threshold</span>
+              <input type="range" min={0} max={0.8} step={0.005} value={threshold}
+                onChange={e => setThreshold(+e.target.value)} className="flex-1" />
+              <span className="text-xs font-mono w-8 text-right opacity-60">{threshold.toFixed(2)}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono opacity-50 w-16 shrink-0">Opacity</span>
+              <input type="range" min={0.1} max={3} step={0.05} value={opacity}
+                onChange={e => setOpacity(+e.target.value)} className="flex-1" />
+              <span className="text-xs font-mono w-8 text-right opacity-60">{opacity.toFixed(1)}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono opacity-50 w-16 shrink-0">Brightness</span>
+              <input type="range" min={0.5} max={3} step={0.05} value={brightness}
+                onChange={e => setBrightness(+e.target.value)} className="flex-1" />
+              <span className="text-xs font-mono w-8 text-right opacity-60">{brightness.toFixed(1)}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono opacity-50 w-16 shrink-0">Quality</span>
+              <input type="range" min={50} max={400} step={10} value={steps}
+                onChange={e => setSteps(+e.target.value)} className="flex-1" />
+              <span className="text-xs font-mono w-8 text-right opacity-60">{steps}</span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
