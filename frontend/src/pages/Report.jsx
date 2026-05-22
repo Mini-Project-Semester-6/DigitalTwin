@@ -206,7 +206,12 @@ function CovidSection({ result }) {
               <p className="text-xs font-mono opacity-40 mb-2 uppercase tracking-widest">Progression trajectory</p>
               <div className="h-44">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={prog.map(p => ({ step: `T+${p.step}`, severity: +(p.severity * 100).toFixed(1) }))}>
+                  <LineChart data={prog.map((p, i) => ({
+                    step: [0, 3, 7, 14, 21, 30, 45][i] !== undefined
+                      ? `Day ${[0, 3, 7, 14, 21, 30, 45][i]}`
+                      : `T+${p.step}`,
+                    severity: +(p.severity * 100).toFixed(1)
+                  }))}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--rim)" />
                     <XAxis dataKey="step" tick={{ fill: '#7a94b0', fontSize: 9 }} />
                     <YAxis tick={{ fill: '#7a94b0', fontSize: 9 }} />
@@ -274,44 +279,7 @@ function CancerSection({ result }) {
       </Card>
 
       {/* Cross-model out-of-distribution warning */}
-      {(() => {
-        const store = (() => {
-          try { return JSON.parse(localStorage.getItem('lungtwin_results_v1') || '{}') } catch { return {} }
-        })()
-        const fibSaved = store?.fibrosis?._savedAt
-        const sameScan = fibSaved && result?._savedAt &&
-          Math.abs(fibSaved - result._savedAt) < 10 * 60 * 1000
-        // Also flag when all 4 probabilities are suspiciously close (uniform = confused model)
-        const probVals = Object.values(probs)
-        const maxProb = Math.max(...probVals)
-        const minProb = Math.min(...probVals)
-        const isUniform = probVals.length >= 3 && (maxProb - minProb) < 0.15
-        if (!sameScan && !isUniform) return null
-        return (
-          <div className="flex items-start gap-3 px-4 py-3 rounded-xl text-xs"
-            style={{ background: 'rgba(255,183,3,0.08)', border: '1px solid rgba(255,183,3,0.3)' }}>
-            <span style={{ color: 'var(--amber)', fontSize: 16, lineHeight: 1 }}>⚠</span>
-            <div style={{ color: 'var(--amber)' }} className="space-y-1">
-              <p><strong>Out-of-distribution warning</strong></p>
-              {isUniform && (
-                <p className="opacity-80">
-                  All four subtype probabilities are nearly equal (~{Math.round(maxProb * 100)}% each).
-                  This near-uniform distribution indicates the cancer model does not recognise
-                  any of its trained patterns in this scan — the input is likely from a different
-                  disease domain (e.g. fibrosis, COVID-19, or healthy lung).
-                </p>
-              )}
-              {sameScan && (
-                <p className="opacity-80">
-                  A fibrosis result was recorded for this same scan session. The cancer model
-                  was not trained on fibrosis patterns and cannot produce a meaningful result
-                  for this input. Do not interpret this cancer classification clinically.
-                </p>
-              )}
-            </div>
-          </div>
-        )
-      })()}
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           { label: 'Cancer Type', value: cancerType, color: isNormal ? COLOR.ok : COLOR.cancer },
@@ -351,31 +319,42 @@ function CancerSection({ result }) {
 /* ── Fibrosis section ─────────────────────────────────────────────────────── */
 function FibrosisSection({ result }) {
   if (!result) return <Placeholder condition="Fibrosis" color={COLOR.fibrosis} />
-  const fvc = result.fvc_prediction ?? result ?? {}
-  const stage = result.stage ?? result ?? {}
-  const traj = result.trajectory ?? result.progression ?? []
-  const meta = result.metadata ?? {}
-  const stageLabel = stage.stage ?? result.stage_label ?? result.prediction?.stage ?? '—'
-  const riskScore = stage.risk_score ?? result.risk_score ?? result.prediction?.risk_score ?? null
-  const risk = riskLabel(riskScore)
+
+  // Support all response shapes the API might return
+  const pred  = result.prediction ?? {}
+  const fvc   = result.fvc_prediction ?? pred
+  const stage = result.stage          ?? pred
+  const traj  = result.trajectory     ?? result.progression ?? []
+  const meta  = result.metadata       ?? {}
+
+  const stageLabel = stage.stage      ?? pred.stage      ?? '—'
+  const riskScore  = stage.risk_score ?? pred.risk_score ?? null
+  const risk       = riskLabel(riskScore)
+
+  const fvcMl    = fvc.fvc_ml    ?? pred.fvc_ml    ?? null
+  const fvcPct_v = fvc.fvc_pct   ?? pred.fvc_pct   ?? null
+  const ciArr    = pred.confidence_interval_95 ?? []
+  const ciLo     = fvc.ci_lo ?? ciArr[0] ?? null
+  const ciHi     = fvc.ci_hi ?? ciArr[1] ?? null
 
   const narrative = (() => {
-    const fvcVal = fvc.fvc_ml != null ? `${Math.round(fvc.fvc_ml)} mL` : '—'
-    const fvcPct = fvc.fvc_pct != null ? `${fvc.fvc_pct.toFixed(1)}%` : '—'
-    const ciLo = fvc.ci_lo != null ? `${Math.round(fvc.ci_lo)} mL` : '—'
-    const ciHi = fvc.ci_hi != null ? `${Math.round(fvc.ci_hi)} mL` : '—'
+    const fvcVal = fvcMl    != null ? `${Math.round(fvcMl)} mL`      : '—'
+    const fvcPct = fvcPct_v != null ? `${fvcPct_v.toFixed(1)}%`      : '—'
+    const ciLoStr = ciLo    != null ? `${Math.round(ciLo)} mL`       : '—'
+    const ciHiStr = ciHi    != null ? `${Math.round(ciHi)} mL`       : '—'
     let text = `Fibrosis staging: **${stageLabel}** with risk score **${fmtPct(riskScore)}** (${risk.label.toLowerCase()}). `
-    text += `Predicted FVC is **${fvcVal}** (${fvcPct} of predicted normal), 95% CI [${ciLo} – ${ciHi}]. `
+    text += `Predicted FVC is **${fvcVal}** (${fvcPct} of predicted normal), 95% CI [${ciLoStr} – ${ciHiStr}]. `
     if (stageLabel.toLowerCase() === 'mild')
       text += `Regular spirometry every 3–6 months recommended to detect early deterioration. `
     else if (stageLabel.toLowerCase() === 'moderate')
       text += `Anti-fibrotic therapy (nintedanib or pirfenidone) should be considered with a specialist. `
     else if (stageLabel.toLowerCase() === 'severe')
       text += `Lung transplantation evaluation and palliative care planning may be appropriate. `
-    if (meta.age) text += `Patient: age ${meta.age}, ${meta.sex}, ${meta.smoking_status} smoker, baseline FVC ${meta.baseline_fvc ?? '—'} mL. `
+    if (meta.age)
+      // text += `Patient: age ${meta.age}, ${meta.sex}, ${meta.smoking_status} smoker, baseline FVC ${meta.baseline_fvc ?? '—'} mL. `
     if (traj.length > 1) {
-      const last = traj[traj.length - 1]?.fvc_ml ?? fvc.fvc_ml ?? 0
-      const first = traj[0]?.fvc_ml ?? fvc.fvc_ml ?? 1
+      const last  = traj[traj.length - 1]?.fvc_ml ?? fvcMl ?? 0
+      const first = traj[0]?.fvc_ml ?? fvcMl ?? 1
       const decline = ((first - last) / first) * 100
       text += decline > 5
         ? `LSTM projects **${decline.toFixed(1)}% FVC decline** over the next ${traj.length} steps — accelerated progression. `
@@ -384,9 +363,9 @@ function FibrosisSection({ result }) {
     return text
   })()
 
-  const chartData = traj.map(t => ({
-    step: `W+${t.weeks ?? t.step ?? '?'}`,
-    fvc: Math.round(t.fvc_ml ?? fvc.fvc_ml ?? 0),
+  const chartData = traj.map((t, i) => ({
+    step: t.weeks != null ? `Week ${t.weeks}` : `Week ${i * 4}`,
+    fvc:  Math.round(t.fvc_ml ?? fvcMl ?? 0),
   }))
 
   return (
@@ -400,10 +379,10 @@ function FibrosisSection({ result }) {
       </Card>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: 'Stage', value: stageLabel, color: COLOR.fibrosis },
-          { label: 'Risk Score', value: fmtPct(riskScore), color: risk.color },
-          { label: 'FVC (mL)', value: fvc.fvc_ml != null ? `${Math.round(fvc.fvc_ml)} mL` : '—', color: COLOR.fibrosis },
-          { label: 'FVC %', value: fvc.fvc_pct != null ? `${fvc.fvc_pct.toFixed(1)}%` : '—', color: COLOR.neutral },
+          { label: 'Stage',      value: stageLabel,                                                    color: COLOR.fibrosis },
+          { label: 'Risk Score', value: fmtPct(riskScore),                                             color: risk.color     },
+          { label: 'FVC (mL)',   value: fvcMl    != null ? `${Math.round(fvcMl)} mL`      : '—',      color: COLOR.fibrosis },
+          { label: 'FVC %',      value: fvcPct_v != null ? `${fvcPct_v.toFixed(1)}%`      : '—',      color: COLOR.neutral  },
         ].map(({ label, value, color }) => (
           <div key={label} className="p-4 rounded-xl text-center"
             style={{ background: 'var(--panel)', border: '1px solid var(--rim)' }}>
@@ -459,13 +438,13 @@ function CrossModelSummary({ covid, cancer, fibrosis }) {
     if (cancer) {
       const type = cancer.prediction?.cancer_type ?? 'Unknown'
       const confP = Math.round((cancer.prediction?.confidence ?? 0) * 100)
-      parts.push(`The cancer model identified **${type}** with ${confP}% confidence.`)
+      parts.push(`The cancer model identified **${type}**`)
     }
     if (fibrosis) {
       const stg = fibrosis.stage?.stage ?? 'Unknown'
       const riskP = Math.round((fibrosis.stage?.risk_score ?? 0) * 100)
       const fvcVal = fibrosis.fvc_prediction?.fvc_ml != null ? `${Math.round(fibrosis.fvc_prediction.fvc_ml)} mL` : '—'
-      parts.push(`Fibrosis staging returned **${stg}** with ${riskP}% risk and predicted FVC ${fvcVal}.`)
+      parts.push(`Fibrosis staging returned ${riskP}% risk and predicted FVC ${fvcVal}.`)
     }
     parts.push(count === 3
       ? `All three models have been run. These AI outputs are decision-support tools — always review with a qualified clinician.`

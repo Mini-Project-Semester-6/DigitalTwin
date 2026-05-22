@@ -83,33 +83,7 @@ function SeverityMetricsCard({ result, accentColor = 'var(--cyan)' }) {
         </div>
       )}
 
-      {/* Metrics grid */}
-      {metricRows.length > 0 && (
-        <div>
-          <p className="text-xs font-mono uppercase tracking-widest opacity-40 mb-3">Model Metrics</p>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-            {metricRows.map(([key, val]) => {
-              const display = Number.isInteger(val)
-                ? val.toLocaleString()
-                : val < 1 && val > 0
-                  ? `${(val * 100).toFixed(2)}%`
-                  : val.toFixed(4)
-              const label = key
-                .replace(/_/g, ' ')
-                .replace(/\b\w/g, c => c.toUpperCase())
-              return (
-                <div key={key} className="p-3 rounded-xl"
-                  style={{ background: 'var(--panel)', border: '1px solid var(--rim)' }}>
-                  <p className="text-xs font-mono opacity-40 mb-1 truncate">{label}</p>
-                  <p className="font-display font-600 text-base" style={{ color: accentColor }}>
-                    {display}
-                  </p>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
+
     </div>
   )
 }
@@ -139,12 +113,6 @@ function VariantCard({ prediction }) {
           <h2 className="font-display font-700 text-2xl" style={{ color }}>
             {variant}
           </h2>
-        </div>
-        <div className="ml-auto text-right">
-          <p className="text-xs font-mono opacity-40">Confidence</p>
-          <p className="font-display font-700 text-xl" style={{ color: 'var(--lavender)' }}>
-            {Math.round(confidence * 100)}%
-          </p>
         </div>
       </div>
 
@@ -213,11 +181,36 @@ function ReconCard({ reconstruction, volumeData }) {
 }
 
 /* ── Progression chart ────────────────────────────────────────────────────── */
-function ProgressionCard({ progression }) {
-  const data = progression.map(p => ({
-    step: `T+${p.step}`,
+function ProgressionCard({ progression, variant }) {
+  const isNegative = variant?.toLowerCase().includes('negative')
+    || variant?.toLowerCase().includes('non-covid')
+    || variant?.toLowerCase() === 'normal'
+
+  if (isNegative) {
+    return (
+      <div className="rounded-2xl p-6 space-y-2 slide-up delay-300"
+        style={{ background: 'var(--card)', border: '1px solid var(--rim)' }}>
+        <div className="flex items-center gap-2">
+          <Clock size={18} style={{ color: 'var(--teal)' }} />
+          <h3 className="font-display font-600 text-base">Disease Progression Simulation</h3>
+        </div>
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
+          style={{ background: 'rgba(0,184,159,0.08)', border: '1px solid rgba(0,184,159,0.25)' }}>
+          <span style={{ color: 'var(--teal)', fontSize: 18 }}>✓</span>
+          <p className="text-sm" style={{ color: 'var(--teal)' }}>
+            <strong>No active disease detected</strong> — progression simulation is not applicable
+            for a {variant} result. No trajectory to model.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  const COVID_DAYS = [0, 3, 7, 14, 21, 30, 45]
+  const data = progression.map((p, i) => ({
+    step: COVID_DAYS[i] !== undefined ? `Day ${COVID_DAYS[i]}` : `Day ${i * 7}`,
     severity: +(p.severity * 100).toFixed(1),
-    delta: +(p.delta_norm * 100).toFixed(2),
+    changeRate: Math.min(100, +(p.delta_norm * 100).toFixed(2)),
   }))
 
   return (
@@ -226,7 +219,7 @@ function ProgressionCard({ progression }) {
       <div className="flex items-center gap-2">
         <Clock size={18} style={{ color: 'var(--amber)' }} />
         <h3 className="font-display font-600 text-base">Disease Progression Simulation</h3>
-        <span className="ml-auto text-xs font-mono opacity-40">{progression.length} future steps</span>
+        <span className="ml-auto text-xs font-mono opacity-40">{progression.length} simulated time points · approximate</span>
       </div>
       <div className="h-56">
         <ResponsiveContainer width="100%" height="100%">
@@ -244,7 +237,7 @@ function ProgressionCard({ progression }) {
             <Legend wrapperStyle={{ fontSize: 11, fontFamily: 'DM Sans' }} />
             <Line type="monotone" dataKey="severity" name="Severity (%)"
               stroke="var(--coral)" strokeWidth={2} dot={{ r: 3, fill: 'var(--coral)' }} />
-            <Line type="monotone" dataKey="delta" name="Δ Latent (×100)"
+            <Line type="monotone" dataKey="changeRate" name="Rate of Change (%)"
               stroke="var(--cyan)" strokeWidth={2} dot={{ r: 3, fill: 'var(--cyan)' }}
               strokeDasharray="4 2" />
           </LineChart>
@@ -256,15 +249,17 @@ function ProgressionCard({ progression }) {
         <table className="w-full text-xs font-mono">
           <thead>
             <tr style={{ color: 'rgba(122,148,176,0.7)' }}>
-              <th className="text-left py-1 pr-4">Step</th>
+              <th className="text-left py-1 pr-4">Time Point</th>
               <th className="text-right py-1 pr-4">Severity</th>
-              <th className="text-right py-1">Δ Latent</th>
+              <th className="text-right py-1">Rate of Change</th>
             </tr>
           </thead>
           <tbody>
             {progression.map(p => (
               <tr key={p.step} className="border-t" style={{ borderColor: 'var(--rim)' }}>
-                <td className="py-1 pr-4" style={{ color: 'var(--cyan)' }}>T+{p.step}</td>
+                <td className="py-1 pr-4" style={{ color: 'var(--cyan)' }}>
+                  {[0, 3, 7, 14, 21, 30, 45][p.step] !== undefined ? `Day ${[0, 3, 7, 14, 21, 30, 45][p.step]}` : `Day ${p.step * 7}`}
+                </td>
                 <td className="text-right py-1 pr-4">
                   <span style={{
                     color: p.severity > .6 ? 'var(--coral)' :
@@ -273,7 +268,14 @@ function ProgressionCard({ progression }) {
                     {(p.severity * 100).toFixed(1)}%
                   </span>
                 </td>
-                <td className="text-right py-1 opacity-60">{p.delta_norm.toFixed(4)}</td>
+                <td className="text-right py-1">
+                  <span style={{
+                    color: p.delta_norm > 0.5 ? 'var(--coral)' :
+                      p.delta_norm > 0.2 ? 'var(--amber)' : 'var(--teal)'
+                  }}>
+                    {Math.min(100, +(p.delta_norm * 100).toFixed(1))}%
+                  </span>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -318,40 +320,21 @@ function CancerResultsPanel({ result }) {
               {prediction.cancer_type}
             </h2>
           </div>
-          <div className="ml-auto text-right">
+          {/* <div className="ml-auto text-right">
             <p className="text-xs font-mono opacity-40">Confidence</p>
             <p className="font-display font-700 text-xl" style={{ color: 'var(--lavender)' }}>
               {Math.round(prediction.confidence * 100)}%
             </p>
-          </div>
+          </div> */}
         </div>
         <SeverityBar value={prediction.severity_score} />
-        {/* Probability bars */}
-        <div className="space-y-2">
-          {Object.entries(prediction.probabilities).map(([name, p]) => {
-            const c = CANCER_COLORS[name] || 'var(--cyan)'
-            return (
-              <div key={name} className="flex items-center gap-3">
-                <span className="w-36 text-xs font-mono" style={{ color: c }}>{name}</span>
-                <div className="flex-1 h-1.5 rounded-full overflow-hidden"
-                  style={{ background: 'var(--rim)' }}>
-                  <div className="h-full rounded-full bar-animate"
-                    style={{ width: `${Math.round(p * 100)}%`, background: c }} />
-                </div>
-                <span className="w-10 text-right text-xs font-mono opacity-60">
-                  {Math.round(p * 100)}%
-                </span>
-              </div>
-            )
-          })}
-        </div>
       </div>
       <MeshCard mesh={mesh} />
       {result.volume_data?.voxels_b64 && (
         <CTViewer3D volumeData={result.volume_data} />
       )}
       <SeverityMetricsCard result={result} accentColor="var(--coral)" />
-      <ProgressionCard progression={progression} />
+      <ProgressionCard progression={progression} variant={prediction?.variant}/>
       <MetricsBar metrics={metrics} />
     </div>
   )
@@ -361,8 +344,8 @@ function FibrosisResultsPanel({ result }) {
   const { prediction, mesh, progression, metrics } = result
   const STAGE_COLOR = { Mild: 'var(--teal)', Moderate: 'var(--amber)', Severe: 'var(--coral)' }
   const color = STAGE_COLOR[prediction.stage] || 'var(--cyan)'
-  const fibChartData = result.progression.map(p => ({
-    step: `W${p.step * 4}`,   // approximate weeks
+  const fibChartData = result.progression.map((p, i) => ({
+    step: p.weeks != null ? `Week ${p.weeks}` : `Week ${i * 4}`,
     fvc: p.fvc_ml,
     risk: +(p.risk * 100).toFixed(1),
   }))
@@ -427,9 +410,7 @@ function FibrosisResultsPanel({ result }) {
       </div>
 
       <MeshCard mesh={mesh} />
-      // Inside FibrosisResultsPanel, replace the ProgressionCard call with:
 
-      // Then render a custom chart inside the panel:
       <div className="rounded-2xl p-6 space-y-4 slide-up delay-300"
         style={{ background: 'var(--card)', border: '1px solid var(--rim)' }}>
         <div className="flex items-center gap-2">
@@ -486,7 +467,9 @@ function FibrosisResultsPanel({ result }) {
                 }[p.stage]
                 return (
                   <tr key={p.step} className="border-t" style={{ borderColor: 'var(--rim)' }}>
-                    <td className="py-1 pr-4" style={{ color: 'var(--cyan)' }}>W{p.step * 4}</td>
+                    <td className="py-1 pr-4" style={{ color: 'var(--cyan)' }}>
+                      {p.weeks != null ? `Week ${p.weeks}` : `Week ${p.step * 4}`}
+                    </td>
                     <td className="text-right py-1 pr-4"
                       style={{ color: 'var(--teal)' }}>{p.fvc_ml.toLocaleString()}</td>
                     <td className="text-right py-1 pr-4">
@@ -534,8 +517,9 @@ function NoduleResultsPanel({ result }) {
   const Icon = isMalignant ? AlertTriangle : Shield
 
   // Trajectory chart data
-  const chartData = trajectory.map(t => ({
-    step: `T+${t.step}`,
+  const NODULE_MONTHS = [0, 2, 4, 6, 9, 12, 18]
+  const chartData = trajectory.map((t, i) => ({
+    step: NODULE_MONTHS[i] !== undefined ? `Mo ${NODULE_MONTHS[i]}` : `Mo ${i * 2}`,
     malignancy: +(t.malignancy_prob * 100).toFixed(1),
     severity: +(t.severity * 100).toFixed(1),
     growthRate: +(t.growth_rate * 100).toFixed(2),
