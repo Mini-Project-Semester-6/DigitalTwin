@@ -12,12 +12,9 @@ from pathlib import Path
 from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
 
-load_dotenv(Path(__file__).parent / ".env")
+load_dotenv(Path(__file__).parent / ".env") 
 
 logger = logging.getLogger(__name__)
-
-MONGO_URI = os.getenv("MONGO_URI", "")
-MONGO_DB  = os.getenv("MONGO_DB", "lungtwin")
 
 _client: AsyncIOMotorClient | None = None
 
@@ -25,15 +22,20 @@ _client: AsyncIOMotorClient | None = None
 def get_client() -> AsyncIOMotorClient:
     global _client
     if _client is None:
-        if not MONGO_URI:
-            raise RuntimeError("MONGO_URI not set in backend/.env")
-        _client = AsyncIOMotorClient(MONGO_URI, serverSelectionTimeoutMS=8000)
+        # Read lazily so Render's injected env vars are available at connection time
+        mongo_uri = os.getenv("MONGO_URI", "")
+        if not mongo_uri:
+            raise RuntimeError(
+                "MONGO_URI is not set. Add it in Render Dashboard â Environment."
+            )
+        _client = AsyncIOMotorClient(mongo_uri, serverSelectionTimeoutMS=8000)
         logger.info("MongoDB Atlas client initialised")
     return _client
 
 
 def get_db():
-    return get_client()[MONGO_DB]
+    mongo_db = os.getenv("MONGO_DB", "lungtwin")
+    return get_client()[mongo_db]
 
 
 # ── Collection schemas ─────────────────────────────────────────────────────
