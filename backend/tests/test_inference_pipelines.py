@@ -1,5 +1,5 @@
 """
-Integration tests for end-to-end inference pipelines with mocked models.
+Integration tests for end-to-end inference pipelines.
 """
 
 import pytest

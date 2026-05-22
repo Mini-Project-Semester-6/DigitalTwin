@@ -488,10 +488,10 @@ function FibrosisResultsPanel({ result }) {
           </table>
         </div>
       </div>
-      <SeverityMetricsCard result={result} accentColor="var(--lavender)" />
+      {/* <SeverityMetricsCard result={result} accentColor="var(--lavender)" /> */}
       {/* <ProgressionCard progression={projection} /> */}
       <MetricsBar metrics={metrics} />
-      {result.metadata_used && (
+      {/* {result.metadata_used && (
         <div className="rounded-2xl p-4 slide-up delay-400"
           style={{ background: 'var(--card)', border: '1px solid var(--rim)' }}>
 
@@ -505,7 +505,7 @@ function FibrosisResultsPanel({ result }) {
             ))}
           </div>
         </div>
-      )}
+      )} */}
     </div>
   )
 }

@@ -212,9 +212,9 @@ export default function CTViewer3D({ volumeData }) {
   const [opacity, setOpacity] = useState(1.0)
   const [brightness, setBrightness] = useState(1.2)
   const [steps, setSteps] = useState(200)
-  const [sliceZ, setSliceZ] = useState(0.5)
-  const [sliceY, setSliceY] = useState(0.5)
-  const [sliceX, setSliceX] = useState(0.5)
+  const [sliceZ, setSliceZ] = useState(0)
+  const [sliceY, setSliceY] = useState(0)
+  const [sliceX, setSliceX] = useState(0)
   const [wl, setWl] = useState(0.5)
   const [ww, setWw] = useState(0.8)
   const [ready, setReady] = useState(false)
@@ -304,6 +304,7 @@ export default function CTViewer3D({ volumeData }) {
     })
 
     const volMesh = new THREE.Mesh(geometry, volMaterial)
+    volMesh.rotation.set(-0.25, 0, 0)   // slight downward tilt → anterior (front) lung face
     scene.add(volMesh)
 
     // MPR slice planes
@@ -314,7 +315,7 @@ export default function CTViewer3D({ volumeData }) {
         fragmentShader: sliceFragShader,
         uniforms: {
           uVolume: { value: volTex },
-          uSlice: { value: 0.5 },
+          uSlice: { value: 0 },
           uAxis: { value: axis },
           uWL: { value: 0.5 },
           uWW: { value: 0.8 },
@@ -483,8 +484,9 @@ export default function CTViewer3D({ volumeData }) {
   const resetCamera = () => {
     const ctx = threeCtx.current
     if (!ctx) return
-    ctx.volMesh.rotation.set(0, 0, 0)
+    ctx.volMesh.rotation.set(-0.25, 0, 0)
     ctx.camera.position.set(0, 0, 2.2)
+    setSliceZ(0); setSliceY(0); setSliceX(0)
   }
 
   const VIEW_MODES = ['3d', 'axial', 'coronal', 'sagittal']

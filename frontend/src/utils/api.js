@@ -62,6 +62,7 @@ export async function runFibrosisPrediction(files, metadata = {}) {
   const { data } = await api.post(`predict/fibrosis?${params}`, form, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
+  data._baseline_fvc = metadata.baseline_fvc ?? 2600.0
   return data
 }
 
