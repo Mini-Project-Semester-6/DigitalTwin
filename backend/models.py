@@ -633,3 +633,4 @@ class OSICFibrosisTwin(nn.Module):
         risk  = torch.sigmoid(self.risk_head(ctx)).squeeze(-1)
         conf  = torch.sigmoid(self.conf_head(ctx)).squeeze(-1)
         return stage, fvc, risk, conf, fused
+    
