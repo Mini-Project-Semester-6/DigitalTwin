@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: lung-twin-backend
+    name: digital-lung
     runtime: python
     rootDir: backend
     buildCommand: pip install -r requirements.txt
