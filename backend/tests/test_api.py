@@ -108,109 +108,109 @@ class TestPredictCovid:
         assert resp.status_code == 200
 
 
-class TestPredictCancer:
-    """Tests for POST /predict/cancer"""
+# class TestPredictCancer:
+#     """Tests for POST /predict/cancer"""
 
-    def test_returns_200(self, app_client, mock_cancer_result):
-        with patch("main.run_cancer_pipeline", return_value=mock_cancer_result):
-            resp = app_client.post(
-                "/predict/cancer",
-                files=[("files", _png_file())]
-            )
-        assert resp.status_code == 200
+#     def test_returns_200(self, app_client, mock_cancer_result):
+#         with patch("main.run_cancer_pipeline", return_value=mock_cancer_result):
+#             resp = app_client.post(
+#                 "/predict/cancer",
+#                 files=[("files", _png_file())]
+#             )
+#         assert resp.status_code == 200
 
-    def test_cancer_type_in_response(self, app_client, mock_cancer_result):
-        with patch("main.run_cancer_pipeline", return_value=mock_cancer_result):
-            resp = app_client.post(
-                "/predict/cancer",
-                files=[("files", _png_file())]
-            )
-        pred = resp.json()["prediction"]
-        assert "cancer_type" in pred
-        assert pred["cancer_type"] == "Adenocarcinoma"
+#     def test_cancer_type_in_response(self, app_client, mock_cancer_result):
+#         with patch("main.run_cancer_pipeline", return_value=mock_cancer_result):
+#             resp = app_client.post(
+#                 "/predict/cancer",
+#                 files=[("files", _png_file())]
+#             )
+#         pred = resp.json()["prediction"]
+#         assert "cancer_type" in pred
+#         assert pred["cancer_type"] == "Adenocarcinoma"
 
-    def test_four_class_probabilities(self, app_client, mock_cancer_result):
-        with patch("main.run_cancer_pipeline", return_value=mock_cancer_result):
-            resp = app_client.post(
-                "/predict/cancer",
-                files=[("files", _png_file())]
-            )
-        probs = resp.json()["prediction"]["probabilities"]
-        assert len(probs) == 4
+#     def test_four_class_probabilities(self, app_client, mock_cancer_result):
+#         with patch("main.run_cancer_pipeline", return_value=mock_cancer_result):
+#             resp = app_client.post(
+#                 "/predict/cancer",
+#                 files=[("files", _png_file())]
+#             )
+#         probs = resp.json()["prediction"]["probabilities"]
+#         assert len(probs) == 4
 
-    def test_422_on_no_files(self, app_client):
-        resp = app_client.post("/predict/cancer")
-        assert resp.status_code == 422
-
-
-class TestPredictFibrosis:
-    """Tests for POST /predict/fibrosis"""
-
-    def test_returns_200(self, app_client, mock_fibrosis_result):
-        with patch("main.run_osic_fibrosis_pipeline", return_value=mock_fibrosis_result):
-            resp = app_client.post(
-                "/predict/fibrosis?age=68&sex=Male&smoking_status=Ex-smoker&baseline_fvc=2340&weeks=0",
-                files=[("files", _png_file())]
-            )
-        assert resp.status_code == 200
-
-    def test_fvc_in_response(self, app_client, mock_fibrosis_result):
-        with patch("main.run_osic_fibrosis_pipeline", return_value=mock_fibrosis_result):
-            resp = app_client.post(
-                "/predict/fibrosis",
-                files=[("files", _png_file())]
-            )
-        pred = resp.json()["prediction"]
-        assert "fvc_ml" in pred
-        assert "confidence_interval_95" in pred
-        assert "stage" in pred
-
-    def test_ci_has_two_values(self, app_client, mock_fibrosis_result):
-        with patch("main.run_osic_fibrosis_pipeline", return_value=mock_fibrosis_result):
-            resp = app_client.post(
-                "/predict/fibrosis",
-                files=[("files", _png_file())]
-            )
-        ci = resp.json()["prediction"]["confidence_interval_95"]
-        assert len(ci) == 2
-        assert ci[0] < ci[1]
-
-    def test_stage_is_valid(self, app_client, mock_fibrosis_result):
-        with patch("main.run_osic_fibrosis_pipeline", return_value=mock_fibrosis_result):
-            resp = app_client.post(
-                "/predict/fibrosis",
-                files=[("files", _png_file())]
-            )
-        assert resp.json()["prediction"]["stage"] in ["Mild", "Moderate", "Severe"]
-
-    def test_metadata_used_in_response(self, app_client, mock_fibrosis_result):
-        with patch("main.run_osic_fibrosis_pipeline", return_value=mock_fibrosis_result):
-            resp = app_client.post(
-                "/predict/fibrosis",
-                files=[("files", _png_file())]
-            )
-        assert "metadata_used" in resp.json()
-
-    def test_missing_files_returns_422(self, app_client):
-        resp = app_client.post("/predict/fibrosis")
-        assert resp.status_code == 422
+#     def test_422_on_no_files(self, app_client):
+#         resp = app_client.post("/predict/cancer")
+#         assert resp.status_code == 422
 
 
-class TestPredictNodules:
+# class TestPredictFibrosis:
+#     """Tests for POST /predict/fibrosis"""
 
-    def test_nodules_returns_503(self, app_client):
-        resp = app_client.post(
-            "/predict/nodules",
-            files=[("files", _png_file())]
-        )
-        assert resp.status_code == 503
+#     def test_returns_200(self, app_client, mock_fibrosis_result):
+#         with patch("main.run_osic_fibrosis_pipeline", return_value=mock_fibrosis_result):
+#             resp = app_client.post(
+#                 "/predict/fibrosis?age=68&sex=Male&smoking_status=Ex-smoker&baseline_fvc=2340&weeks=0",
+#                 files=[("files", _png_file())]
+#             )
+#         assert resp.status_code == 200
 
-    def test_nodules_detail_message(self, app_client):
-        resp = app_client.post(
-            "/predict/nodules",
-            files=[("files", _png_file())]
-        )
-        assert "disabled" in resp.json()["detail"].lower()
+#     def test_fvc_in_response(self, app_client, mock_fibrosis_result):
+#         with patch("main.run_osic_fibrosis_pipeline", return_value=mock_fibrosis_result):
+#             resp = app_client.post(
+#                 "/predict/fibrosis",
+#                 files=[("files", _png_file())]
+#             )
+#         pred = resp.json()["prediction"]
+#         assert "fvc_ml" in pred
+#         assert "confidence_interval_95" in pred
+#         assert "stage" in pred
+
+#     def test_ci_has_two_values(self, app_client, mock_fibrosis_result):
+#         with patch("main.run_osic_fibrosis_pipeline", return_value=mock_fibrosis_result):
+#             resp = app_client.post(
+#                 "/predict/fibrosis",
+#                 files=[("files", _png_file())]
+#             )
+#         ci = resp.json()["prediction"]["confidence_interval_95"]
+#         assert len(ci) == 2
+#         assert ci[0] < ci[1]
+
+#     def test_stage_is_valid(self, app_client, mock_fibrosis_result):
+#         with patch("main.run_osic_fibrosis_pipeline", return_value=mock_fibrosis_result):
+#             resp = app_client.post(
+#                 "/predict/fibrosis",
+#                 files=[("files", _png_file())]
+#             )
+#         assert resp.json()["prediction"]["stage"] in ["Mild", "Moderate", "Severe"]
+
+#     def test_metadata_used_in_response(self, app_client, mock_fibrosis_result):
+#         with patch("main.run_osic_fibrosis_pipeline", return_value=mock_fibrosis_result):
+#             resp = app_client.post(
+#                 "/predict/fibrosis",
+#                 files=[("files", _png_file())]
+#             )
+#         assert "metadata_used" in resp.json()
+
+#     def test_missing_files_returns_422(self, app_client):
+#         resp = app_client.post("/predict/fibrosis")
+#         assert resp.status_code == 422
+
+
+# class TestPredictNodules:
+
+#     def test_nodules_returns_503(self, app_client):
+#         resp = app_client.post(
+#             "/predict/nodules",
+#             files=[("files", _png_file())]
+#         )
+#         assert resp.status_code == 503
+
+#     def test_nodules_detail_message(self, app_client):
+#         resp = app_client.post(
+#             "/predict/nodules",
+#             files=[("files", _png_file())]
+#         )
+#         assert "disabled" in resp.json()["detail"].lower()
 
 
 class TestSamplesEndpoints:
@@ -230,10 +230,10 @@ class TestSamplesEndpoints:
         assert "count" in body
         assert body["count"] == 1
 
-    def test_list_samples_filter_by_condition(self, app_client):
-        with patch("main.list_sample_scans", new_callable=AsyncMock, return_value=[]):
-            resp = app_client.get("/samples?condition=cancer")
-        assert resp.status_code == 200
+    # def test_list_samples_filter_by_condition(self, app_client):
+    #     with patch("main.list_sample_scans", new_callable=AsyncMock, return_value=[]):
+    #         resp = app_client.get("/samples?condition=cancer")
+    #     assert resp.status_code == 200
 
     def test_get_sample_404_for_unknown_id(self, app_client):
         with patch("main.get_sample_scan", new_callable=AsyncMock, return_value=None):

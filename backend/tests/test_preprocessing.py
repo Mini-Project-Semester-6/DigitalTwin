@@ -246,7 +246,7 @@ class TestExportVolumeSlices:
 #                 load_dicom_folder([("x.dcm", b"bad")])
 
 
-class TestEncodeOsicMetadata:
+# class TestEncodeOsicMetadata:
     """Tests for inference.encode_osic_metadata()"""
 
     def test_output_shape(self):

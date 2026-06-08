@@ -81,8 +81,8 @@ async def upload_scan(title, condition, folder_path, metadata=None):
 
 asyncio.run(
     upload_scan(
-        "Fibrosis Pos",
-        "fibrosis",
+        "COVID Neg",
+        "covid19",
         r"D:\Downloads\CT Scans\Case_001"
     )
 )

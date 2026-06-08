@@ -104,7 +104,7 @@ function CovidSection({ result }) {
     const conf = pred.confidence != null ? `${(pred.confidence * 100).toFixed(0)}%` : '—'
     const sevLabel = sev.label.toLowerCase()
     const worsening = prog.length > 1 ? prog[prog.length - 1].severity > prog[0].severity : null
-    let text = `The COVID-19 model classified this scan as **${variant}** with ${conf} confidence. `
+    let text = `The COVID-19 model classified this scan as **${variant}**. `
     if (isPos) {
       text += `Severity is **${fmtPct(pred.severity_score)}** (${sevLabel}). `
       text += sevLabel === 'low' ? 'Mild involvement with favourable outlook. '
@@ -340,7 +340,7 @@ function FibrosisSection({ result }) {
           { label: 'Stage', value: stageLabel, color: COLOR.fibrosis },
           { label: 'Risk Score', value: fmtPct(riskScore), color: risk.color },
           { label: 'FVC (mL)', value: fvcMl != null ? `${Math.round(fvcMl)} mL` : '—', color: COLOR.fibrosis },
-          { label: 'FVC %', value: fvcPct_v != null ? `${fvcPct_v.toFixed(1)}%` : '—', color: COLOR.neutral },
+          // { label: 'FVC %', value: fvcPct_v != null ? `${fvcPct_v.toFixed(1)}%` : '—', color: COLOR.neutral },
         ].map(({ label, value, color }) => (
           <div key={label} className="p-4 rounded-xl text-center"
             style={{ background: 'var(--panel)', border: '1px solid var(--rim)' }}>
@@ -350,23 +350,6 @@ function FibrosisSection({ result }) {
         ))}
       </div>
       <SeverityMetricsBlock result={result} accent={COLOR.fibrosis} />
-      {chartData.length > 1 && (
-        <Card>
-          <p className="text-xs font-mono opacity-40 mb-2 uppercase tracking-widest">FVC decline trajectory</p>
-          <div className="h-44">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--rim)" />
-                <XAxis dataKey="step" tick={{ fill: '#7a94b0', fontSize: 9 }} />
-                <YAxis tick={{ fill: '#7a94b0', fontSize: 9 }} />
-                <RechartTip contentStyle={{ background: 'var(--card)', border: '1px solid var(--rim)', borderRadius: 8 }}
-                  formatter={v => [`${v} mL`, 'FVC']} />
-                <Line type="monotone" dataKey="fvc" stroke={COLOR.fibrosis} strokeWidth={2} dot={{ r: 3 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
-      )}
     </div>
   )
 }
@@ -404,9 +387,9 @@ function CrossModelSummary({ covid, cancer, fibrosis }) {
       const fvcVal = fibrosis.prediction?.fvc_ml != null ? `${Math.round(fibrosis.prediction.fvc_ml)} mL` : '—'
       parts.push(`Fibrosis staging returned **${riskP}%** risk and predicted FVC **${fvcVal}**.`)
     }
-    parts.push(count === 3
-      ? `All three models have been run. These AI outputs are decision-support tools — always review with a qualified clinician.`
-      : `${3 - count} model${3 - count > 1 ? 's have' : ' has'} not yet been run. Run all three for a complete cross-disease report.`)
+    // parts.push(count === 3
+    //   ? `All three models have been run. These AI outputs are decision-support tools — always review with a qualified clinician.`
+    //   : `${3 - count} model${3 - count > 1 ? 's have' : ' has'} not yet been run. Run all three for a complete cross-disease report.`)
     return parts
   })()
 
@@ -428,9 +411,9 @@ function CrossModelSummary({ covid, cancer, fibrosis }) {
     <div className="space-y-4">
       <div className="flex items-center gap-3">
         {[
-          { label: 'COVID-19', done: !!covid, color: COLOR.covid },
-          { label: 'Cancer', done: !!cancer, color: COLOR.cancer },
-          { label: 'Fibrosis', done: !!fibrosis, color: COLOR.fibrosis },
+          // { label: 'COVID-19', done: !!covid, color: COLOR.covid },
+          // { label: 'Cancer', done: !!cancer, color: COLOR.cancer },
+          // { label: 'Fibrosis', done: !!fibrosis, color: COLOR.fibrosis },
         ].map(({ label, done, color }) => (
           <div key={label} className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl"
             style={{ background: done ? `${color}18` : 'var(--panel)', border: `1px solid ${done ? color : 'var(--rim)'}` }}>
@@ -442,8 +425,9 @@ function CrossModelSummary({ covid, cancer, fibrosis }) {
 
       <div className="rounded-2xl p-5 space-y-3"
         style={{ background: 'var(--card)', border: '1px solid rgba(255,255,255,0.08)' }}>
-        <SectionHead icon={FileText} title="Combined Assessment" accent="var(--white)"
-          subtitle={`${count} of 3 models completed`} />
+        <SectionHead icon={FileText} title="Assessment" accent="var(--white)"
+          // subtitle={`${count} of 3 models completed`} 
+          />
         <div className="space-y-3 text-sm leading-relaxed opacity-80">
           {narrative?.map((para, i) => (
             <p key={i}>
@@ -479,13 +463,12 @@ function CrossModelSummary({ covid, cancer, fibrosis }) {
 export default function Report() {
   const { results, clearAll } = useResultsStore()
   const { covid19: covid, cancer, fibrosis } = results
-  const [activeTab, setActiveTab] = useState('summary')
+  const [activeTab, setActiveTab] = useState('covid19')
 
   const tabs = [
-    { id: 'summary', label: 'Summary', color: null },
     { id: 'covid19', label: 'COVID-19', color: COLOR.covid, hasResult: !!covid },
-    { id: 'cancer', label: 'Cancer', color: COLOR.cancer, hasResult: !!cancer },
-    { id: 'fibrosis', label: 'Fibrosis', color: COLOR.fibrosis, hasResult: !!fibrosis },
+    // { id: 'cancer', label: 'Cancer', color: COLOR.cancer, hasResult: !!cancer },
+    // { id: 'fibrosis', label: 'Fibrosis', color: COLOR.fibrosis, hasResult: !!fibrosis },
   ]
 
   const handleDownloadAll = () => {

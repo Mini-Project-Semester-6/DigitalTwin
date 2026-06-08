@@ -24,9 +24,9 @@ function fmtAge(ms) {
 }
 
 const CONDITION_META = {
-  covid19:  { label: 'COVID-19',          color: 'var(--cyan)'     },
-  cancer:   { label: 'Lung Cancer',        color: 'var(--coral)'    },
-  fibrosis: { label: 'Pulmonary Fibrosis', color: 'var(--lavender)' },
+  covid19:  { label: 'COVID-19',          color: 'var(--cyan)'     }
+  // cancer:   { label: 'Lung Cancer',        color: 'var(--coral)'    },
+  // fibrosis: { label: 'Pulmonary Fibrosis', color: 'var(--lavender)' },
 }
 
 const STEPS = [

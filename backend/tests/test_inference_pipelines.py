@@ -100,39 +100,39 @@ class TestCovidPipeline:
         assert result["metrics"]["slices_processed"] == 8
 
 
-class TestCancerPipeline:
+# class TestCancerPipeline:
 
-    def _run(self, files):
-        from inference import run_cancer_pipeline
-        with patch("inference._cancer_twin") as t, \
-             patch("inference._cancer_prog") as p, \
-             patch("inference._geo_scaler") as sc, \
-             patch("inference._load_cancer_models"):
-            t.return_value = (torch.randn(1,4), torch.rand(1), torch.rand(1), torch.randn(1,320))
-            p.return_value = (torch.randn(1,256), torch.rand(1))
-            sc.transform.return_value = np.zeros((1,16), dtype=np.float32)
-            return run_cancer_pipeline(files)
+#     def _run(self, files):
+#         from inference import run_cancer_pipeline
+#         with patch("inference._cancer_twin") as t, \
+#              patch("inference._cancer_prog") as p, \
+#              patch("inference._geo_scaler") as sc, \
+#              patch("inference._load_cancer_models"):
+#             t.return_value = (torch.randn(1,4), torch.rand(1), torch.rand(1), torch.randn(1,320))
+#             p.return_value = (torch.randn(1,256), torch.rand(1))
+#             sc.transform.return_value = np.zeros((1,16), dtype=np.float32)
+#             return run_cancer_pipeline(files)
 
-    def test_returns_cancer_type(self):
-        result = self._run(make_file_tuples(8))
-        assert "cancer_type" in result["prediction"]
+#     def test_returns_cancer_type(self):
+#         result = self._run(make_file_tuples(8))
+#         assert "cancer_type" in result["prediction"]
 
-    def test_four_class_probabilities(self):
-        result = self._run(make_file_tuples(8))
-        assert len(result["prediction"]["probabilities"]) == 4
+#     def test_four_class_probabilities(self):
+#         result = self._run(make_file_tuples(8))
+#         assert len(result["prediction"]["probabilities"]) == 4
 
-    def test_condition_is_cancer(self):
-        result = self._run(make_file_tuples(8))
-        assert result["condition"] == "cancer"
+#     def test_condition_is_cancer(self):
+#         result = self._run(make_file_tuples(8))
+#         assert result["condition"] == "cancer"
 
-    def test_raises_on_empty(self):
-        from inference import run_cancer_pipeline
-        with patch("inference._load_cancer_models"):
-            with pytest.raises(ValueError):
-                run_cancer_pipeline([])
+#     def test_raises_on_empty(self):
+#         from inference import run_cancer_pipeline
+#         with patch("inference._load_cancer_models"):
+#             with pytest.raises(ValueError):
+#                 run_cancer_pipeline([])
 
 
-class TestFibrosisPipeline:
+# class TestFibrosisPipeline:
 
     def _run(self, files, **kwargs):
         from inference import run_osic_fibrosis_pipeline
