@@ -187,7 +187,7 @@ def export_volume_slices(slices: list, max_slices: int = 128,
         "legacy_slices": legacy,
     }
 
-# uvicorn main:app --host 0.0.0.0 --port 8000 --reload 
+
 def _load_nodule_models():
     global _unet, _nodule_clf, _nodule_lstm
 
@@ -1020,34 +1020,60 @@ def decode_latent(z: torch.Tensor) -> np.ndarray:
 
 
 # ─── progression simulation ──────────────────────────────────────────────────
-def simulate_progression_from_z(z0: torch.Tensor, steps: int = SEQ_STEPS
-                          ) -> list[dict]:
+def simulate_progression_from_z(z0: torch.Tensor,
+                                  steps: int = SEQ_STEPS,
+                                  initial_severity: float = None) -> list[dict]:
     """
-    Given initial latent z0 (320-d fused), roll forward `steps` time-steps.
-    The progression LSTM expects 256-d input; we take first 256 dims.
-    Returns a list of {step, severity, delta_norm} dicts.
-    Uses _cancer_prog if available (called from cancer pipeline),
-    otherwise falls back to _prog (called from covid pipeline).
+    If initial_severity < 0.05 (sub-clinical / negative case):
+        - All steps return the same severity as initial_severity
+        - delta_norm and rate are returned as None
+        - Frontend should display "No significant progression detected"
+
+    If initial_severity >= 0.05:
+        - Normal LSTM rollout anchored to initial_severity
     """
-    prog_model = _cancer_prog if _cancer_prog is not None else _prog
     results = []
-    # Projection: use first 256 dims of the fused 320-d vector
-    z = z0[:, :LATENT_DIM].clone().to(DEVICE)            # (1, 256)
+    z = z0[:, :LATENT_DIM].clone().to(DEVICE)
+
+    # Sub-clinical threshold
+    if initial_severity is not None and initial_severity < 0.05:
+        for t in range(steps):
+            results.append({
+                "step":       t + 1,
+                "severity":   round(initial_severity, 4),
+                "delta_norm": None,
+                "rate":       None,
+            })
+        return results
 
     with torch.no_grad():
+        first_delta = None
         for t in range(steps):
-            seq = z.unsqueeze(1)                          # (1, 1, 256)
-            z_next, sev = prog_model(seq)
+            seq = z.unsqueeze(1)
+            z_next, sev_raw = _prog(seq)
             delta = float((z_next - z).norm().item())
+
+            if first_delta is None:
+                first_delta = delta + 1e-8
+
+            if initial_severity is not None:
+                cumulative_drift = delta / first_delta
+                sev_display = min(1.0, initial_severity + (1 - initial_severity)
+                                  * (1 - cumulative_drift) * 0.15 * t)
+            else:
+                sev_display = float(torch.sigmoid(sev_raw).item())
+
+            rate = round(min(1.0, delta / first_delta), 4) if first_delta else 1.0
+
             results.append({
-                "step": t + 1,
-                "severity": float(torch.sigmoid(sev).item()),
+                "step":       t + 1,
+                "severity":   round(sev_display, 4),
                 "delta_norm": round(delta, 4),
+                "rate":       rate,
             })
             z = z_next
 
     return results
-
 
 # ─── main entry-point ────────────────────────────────────────────────────────
 def run_full_pipeline(image_bytes_list: list[tuple[str, bytes]]) -> dict:
@@ -1086,7 +1112,8 @@ def run_full_pipeline(image_bytes_list: list[tuple[str, bytes]]) -> dict:
     recon_b64  = _ndarray_to_b64png(recon_arr)
 
     # ── Step 6: disease progression ───────────────────────────────────────
-    progression = simulate_progression_from_z(latent)
+    progression = simulate_progression_from_z(latent,
+                                            initial_severity=severity   )
 
     elapsed = round(time.time() - t0, 3)
 

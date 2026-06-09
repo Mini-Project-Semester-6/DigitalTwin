@@ -16,7 +16,7 @@ export default function About() {
   return (
     <div className="max-w-3xl mx-auto px-6 py-12 space-y-10">
       <section className="space-y-2">
-        <h1 className="font-display font-700 text-3xl tracking-tight">About LungTwin</h1>
+        <h1 className="font-display font-700 text-3xl tracking-tight">About Lung Digital Twin</h1>
         <p className="opacity-55 leading-relaxed">
           LungTwin is a full-stack COVID-19 diagnostic assistant powered by a Lung Digital Twin model —
           an AI system that encodes patient CT scans into a latent 3-D representation for variant
@@ -30,7 +30,7 @@ export default function About() {
         <div className="space-y-3">
           {[
             {
-              title: '2.5D CNN Encoder (EfficientNet-B0)',
+              title: '3D CNN Encoder (EfficientNet-B0)',
               desc: 'Three adjacent CT slices are stacked into a 3-channel 224×224 tensor and passed through an EfficientNet-B0 backbone (1280-d features) projected to 512 dimensions.',
               accent: 'var(--cyan)',
             },
@@ -46,7 +46,7 @@ export default function About() {
             },
             {
               title: 'Prediction Heads',
-              desc: 'Three independent heads: classifier (3-class: Normal / Delta / Omicron), severity regressor [0,1], and confidence estimator.',
+              desc: 'Three independent heads: classifier (2-class: COVID19 / Non-COVID19), severity regressor [0,1], and confidence estimator.',
               accent: 'var(--teal)',
             },
             {

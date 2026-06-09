@@ -181,106 +181,132 @@ function ReconCard({ reconstruction, volumeData }) {
 }
 
 /* ── Progression chart ────────────────────────────────────────────────────── */
-function ProgressionCard({ progression, variant }) {
-  const isNegative = variant?.toLowerCase().includes('negative')
-    || variant?.toLowerCase().includes('non-covid')
-    || variant?.toLowerCase() === 'normal'
+function ProgressionCard({ progression }) {
+  if (!progression?.length) return null
 
-  if (isNegative) {
-    return (
-      <div className="rounded-2xl p-6 space-y-2 slide-up delay-300"
-        style={{ background: 'var(--card)', border: '1px solid var(--rim)' }}>
-        <div className="flex items-center gap-2">
-          <Clock size={18} style={{ color: 'var(--teal)' }} />
-          <h3 className="font-display font-600 text-base">Disease Progression Simulation</h3>
-        </div>
-        <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
-          style={{ background: 'rgba(0,184,159,0.08)', border: '1px solid rgba(0,184,159,0.25)' }}>
-          <span style={{ color: 'var(--teal)', fontSize: 18 }}>✓</span>
-          <p className="text-sm" style={{ color: 'var(--teal)' }}>
-            <strong>No active disease detected</strong> — progression simulation is not applicable
-            for a {variant} result. No trajectory to model.
-          </p>
-        </div>
-      </div>
-    )
-  }
+  const isFlat = progression.every(p => p.rate === null && p.delta_norm === null)
 
-  const COVID_DAYS = [0, 3, 7, 14, 21, 30, 45]
-  const data = progression.map((p, i) => ({
-    step: COVID_DAYS[i] !== undefined ? `Day ${COVID_DAYS[i]}` : `Day ${i * 7}`,
+  // Chart data
+  const chartData = progression.map(p => ({
+    step:     `T+${p.step}`,
     severity: +(p.severity * 100).toFixed(1),
-    changeRate: Math.min(100, +(p.delta_norm * 100).toFixed(2)),
+    // Only include rate in chart data if it exists
+    ...(p.rate !== null && p.rate !== undefined
+      ? { rate: +(p.rate * 100).toFixed(1) }
+      : {}),
   }))
 
   return (
     <div className="rounded-2xl p-6 space-y-4 slide-up delay-300"
-      style={{ background: 'var(--card)', border: '1px solid var(--rim)' }}>
+         style={{ background: 'var(--card)', border: '1px solid var(--rim)' }}>
+
+      {/* Header */}
       <div className="flex items-center gap-2">
         <Clock size={18} style={{ color: 'var(--amber)' }} />
         <h3 className="font-display font-600 text-base">Disease Progression Simulation</h3>
-        <span className="ml-auto text-xs font-mono opacity-40">{progression.length} simulated time points · approximate</span>
-      </div>
-      <div className="h-56">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--rim)" />
-            <XAxis dataKey="step"
-              tick={{ fill: '#7a94b0', fontSize: 10, fontFamily: 'JetBrains Mono' }} />
-            <YAxis tick={{ fill: '#7a94b0', fontSize: 10, fontFamily: 'JetBrains Mono' }} />
-            <RechartTip
-              contentStyle={{
-                background: 'var(--card)', border: '1px solid var(--rim)',
-                borderRadius: 8, fontFamily: 'DM Sans'
-              }}
-            />
-            <Legend wrapperStyle={{ fontSize: 11, fontFamily: 'DM Sans' }} />
-            <Line type="monotone" dataKey="severity" name="Severity (%)"
-              stroke="var(--coral)" strokeWidth={2} dot={{ r: 3, fill: 'var(--coral)' }} />
-            <Line type="monotone" dataKey="changeRate" name="Rate of Change (%)"
-              stroke="var(--cyan)" strokeWidth={2} dot={{ r: 3, fill: 'var(--cyan)' }}
-              strokeDasharray="4 2" />
-          </LineChart>
-        </ResponsiveContainer>
+        <span className="ml-auto text-xs font-mono opacity-40">
+          {progression.length} future steps
+        </span>
       </div>
 
-      {/* step table */}
+      {/* Flat / sub-clinical state */}
+      {isFlat ? (
+        <div className="flex flex-col items-center justify-center gap-3 py-6 rounded-xl"
+             style={{ background: 'var(--panel)', border: '1px solid rgba(34,197,94,0.3)' }}>
+          <div className="flex items-center gap-2">
+            <span className="text-2xl"></span>
+            <span className="font-display font-600 text-base"
+                  style={{ color: 'var(--teal)' }}>
+              No Significant Progression Detected
+            </span>
+          </div>
+          <p className="text-xs font-mono opacity-50 text-center max-w-xs">
+            Severity is below the 5% clinical threshold. The digital twin predicts
+            a stable disease state with no meaningful trajectory over the simulation window.
+          </p>
+          <div className="px-4 py-2 rounded-lg"
+               style={{ background: 'rgba(0,184,159,0.12)',
+                        border: '1px solid rgba(0,184,159,0.3)' }}>
+            <span className="text-sm font-mono" style={{ color: 'var(--teal)' }}>
+              Severity held at {(progression[0].severity * 100).toFixed(1)}% across all steps
+            </span>
+          </div>
+        </div>
+      ) : (
+        /* Normal progression chart */
+        <div className="h-56">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData}
+                       margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--rim)" />
+              <XAxis dataKey="step"
+                     tick={{ fill: '#7a94b0', fontSize: 10,
+                             fontFamily: 'JetBrains Mono' }} />
+              <YAxis tick={{ fill: '#7a94b0', fontSize: 10,
+                             fontFamily: 'JetBrains Mono' }} />
+              <RechartTip
+                contentStyle={{ background: 'var(--card)',
+                                border: '1px solid var(--rim)',
+                                borderRadius: 8, fontFamily: 'DM Sans' }} />
+              <Legend wrapperStyle={{ fontSize: 11, fontFamily: 'DM Sans' }} />
+              <Line type="monotone" dataKey="severity"
+                    name="Severity (%)"
+                    stroke="var(--coral)" strokeWidth={2}
+                    dot={{ r: 3, fill: 'var(--coral)' }} />
+              <Line type="monotone" dataKey="rate"
+                    name="Rate of Change (%)"
+                    stroke="var(--cyan)" strokeWidth={2}
+                    dot={{ r: 3, fill: 'var(--cyan)' }}
+                    strokeDasharray="4 2" />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Step table */}
       <div className="overflow-x-auto">
         <table className="w-full text-xs font-mono">
           <thead>
             <tr style={{ color: 'rgba(122,148,176,0.7)' }}>
-              <th className="text-left py-1 pr-4">Time Point</th>
+              <th className="text-left py-1 pr-4">Step</th>
               <th className="text-right py-1 pr-4">Severity</th>
               <th className="text-right py-1">Rate of Change</th>
             </tr>
           </thead>
           <tbody>
             {progression.map(p => (
-              <tr key={p.step} className="border-t" style={{ borderColor: 'var(--rim)' }}>
-                <td className="py-1 pr-4" style={{ color: 'var(--cyan)' }}>
-                  {[0, 3, 7, 14, 21, 30, 45][p.step] !== undefined ? `Day ${[0, 3, 7, 14, 21, 30, 45][p.step]}` : `Day ${p.step * 7}`}
+              <tr key={p.step} className="border-t"
+                  style={{ borderColor: 'var(--rim)' }}>
+                <td className="py-1 pr-4"
+                    style={{ color: 'var(--cyan)' }}>
+                  T+{p.step}
                 </td>
                 <td className="text-right py-1 pr-4">
                   <span style={{
-                    color: p.severity > .6 ? 'var(--coral)' :
-                      p.severity > .3 ? 'var(--amber)' : 'var(--teal)'
+                    color: p.severity > 0.6 ? 'var(--coral)'
+                         : p.severity > 0.3 ? 'var(--amber)'
+                         : 'var(--teal)'
                   }}>
                     {(p.severity * 100).toFixed(1)}%
                   </span>
                 </td>
                 <td className="text-right py-1">
-                  <span style={{
-                    color: p.delta_norm > 0.5 ? 'var(--coral)' :
-                      p.delta_norm > 0.2 ? 'var(--amber)' : 'var(--teal)'
-                  }}>
-                    {Math.min(100, +(p.delta_norm * 100).toFixed(1))}%
-                  </span>
+                  {p.rate === null || p.rate === undefined
+                    ? <span style={{ color: 'var(--teal)',
+                                     fontStyle: 'italic' }}>
+                        — stable
+                      </span>
+                    : <span className="opacity-60">
+                        {(p.rate * 100).toFixed(1)}%
+                      </span>
+                  }
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
     </div>
   )
 }
@@ -334,7 +360,7 @@ function CancerResultsPanel({ result }) {
         <CTViewer3D volumeData={result.volume_data} />
       )}
       <SeverityMetricsCard result={result} accentColor="var(--coral)" />
-      <ProgressionCard progression={progression} variant={prediction?.variant}/>
+      <ProgressionCard progression={progression} variant={prediction?.variant} />
       <MetricsBar metrics={metrics} />
     </div>
   )
@@ -518,11 +544,13 @@ function NoduleResultsPanel({ result }) {
 
   // Trajectory chart data
   const NODULE_MONTHS = [0, 2, 4, 6, 9, 12, 18]
-  const chartData = trajectory.map((t, i) => ({
-    step: NODULE_MONTHS[i] !== undefined ? `Mo ${NODULE_MONTHS[i]}` : `Mo ${i * 2}`,
-    malignancy: +(t.malignancy_prob * 100).toFixed(1),
-    severity: +(t.severity * 100).toFixed(1),
-    growthRate: +(t.growth_rate * 100).toFixed(2),
+  const chartData = progression.map(p => ({
+    step: `T+${p.step}`,
+    severity: +(p.severity * 100).toFixed(1),
+    // Use rate field if available, fall back to delta_norm normalised
+    rate: p.rate !== undefined
+      ? +(p.rate * 100).toFixed(1)
+      : +(Math.min(1, p.delta_norm / (progression[0].delta_norm + 1e-8)) * 100).toFixed(1),
   }))
 
   return (
@@ -720,7 +748,10 @@ function NoduleResultsPanel({ result }) {
                       {(t.severity * 100).toFixed(1)}%
                     </span>
                   </td>
-                  <td className="text-right py-1 opacity-60">{t.growth_rate.toFixed(4)}</td>
+                  <td className="text-right py-1 opacity-60">{p.rate !== undefined
+                    ? `${(p.rate * 100).toFixed(1)}%`
+                    : `${Math.min(100, (p.delta_norm / (progression[0]?.delta_norm + 1e-8)) * 100).toFixed(1)}%`
+                  }</td>
                 </tr>
               ))}
             </tbody>

@@ -44,7 +44,7 @@ def get_db():
 # {
 #   "_id":        ObjectId,
 #   "title":      str,          e.g. "COVID-Positive Sample #1"
-#   "condition":  str,          "covid19" | "cancer" | "fibrosis" | "nodules"
+#   "condition":  str,          "covid19"
 #   "description":str,
 #   "tags":       list[str],
 #   "slice_count":int,

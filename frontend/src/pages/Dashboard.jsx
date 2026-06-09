@@ -6,20 +6,20 @@ import {
 } from '@tabler/icons-react'
 
 const FEATURES = [
-  { Icon: IconScan,      title: '2.5D CNN Encoder',    accent: 'var(--cyan)',    body: 'EfficientNet-B0/B2 backbone processes stacked CT slices in a tri-channel tensor, extracting rich spatial features from lung parenchyma.' },
+  { Icon: IconScan,      title: '3D CNN Encoder',    accent: 'var(--cyan)',    body: 'EfficientNet-B0/B2 backbone processes stacked CT slices in a tri-channel tensor, extracting rich spatial features from lung parenchyma.' },
   { Icon: IconLungs,     title: '3-D Mesh Reconstruction', accent: 'var(--lavender)', body: 'Geometric features from volumetric segmentation approximate Marching Cubes mesh statistics including HD95 and surface-to-volume ratio.' },
   { Icon: IconGitBranch, title: 'Temporal LSTM',        accent: 'var(--amber)',   body: '3-layer LSTM with multi-head attention simulates disease trajectory, projecting 7 future severity states from the patient latent embedding.' },
   { Icon: IconCpu,       title: 'Digital Twin State',   accent: 'var(--teal)',    body: 'A 256-dimensional latent space encodes each patient as a unique digital representation, enabling CT slice reconstruction via the decoder.' },
 ]
 
 const STATS = [
-  { value: '95.0%',  label: 'COVID-19 Accuracy',   color: 'var(--cyan)'    },
+  { value: '95.8%',  label: 'COVID-19 Accuracy',   color: 'var(--cyan)'    },
   { value: '0.956',  label: 'AUC-ROC (COVID)',      color: 'var(--teal)'    },
-  { value: '0.950',  label: 'Cancer AUC-ROC',       color: 'var(--lavender)'},
-  { value: '0.939',  label: 'Fibrosis Binary AUC',  color: 'var(--amber)'   },
+  { value: '0.958',  label: 'Precision',       color: 'var(--lavender)'},
+  { value: '0.968',  label: 'Recall',  color: 'var(--amber)'   },
 ]
 
-const PIPELINE = ['CT Scan (PNG/DICOM)', '2.5D CNN Encoder', '3D Reconstruction', 'Digital Twin Latent', 'Temporal LSTM', 'Predictions & Projections']
+const PIPELINE = ['CT Scan (PNG/DICOM)', '3D CNN Encoder', '3D Reconstruction', 'Digital Twin Latent', 'Temporal LSTM', 'Predictions & Projections']
 
 export default function Dashboard() {
   return (
@@ -35,7 +35,7 @@ export default function Dashboard() {
               <div className="d-flex align-items-center gap-2 mb-2">
                 <span className="badge" style={{ background:'rgba(0,212,232,0.15)', color:'var(--cyan)', border:'1px solid rgba(0,212,232,0.3)' }}>
                   <IconCircleDot size={10} className="me-1" />
-                  Pulmonary AI Platform
+                  Lung Digital Twin Platform
                 </span>
               </div>
               <h1 className="h2 fw-bold mb-2" style={{ color: 'var(--white)', fontFamily:'"Space Grotesk",system-ui' }}>
@@ -43,7 +43,7 @@ export default function Dashboard() {
                 <span className="glow-cyan" style={{ color: 'var(--cyan)' }}>Simulate.</span>
               </h1>
               <p className="text-muted mb-3">
-                Upload CT scan slices and let the digital twin classify COVID-19 variants, score severity,
+                Upload CT scan slices and let the digital twin classify COVID-19 variants,
                 reconstruct 3-D lung geometry, and project future disease states.
               </p>
               <Link to="/analyze" className="btn btn-primary d-inline-flex align-items-center gap-2">
@@ -129,10 +129,7 @@ export default function Dashboard() {
                 ['COVID Variant','COVID-Neg / COVID-Pos','var(--teal)'],
                 ['Severity','Continuous [0,1] score','var(--coral)'],
                 ['CT Recon','64×64 latent reconstruction','var(--amber)'],
-                ['Cancer Type','Adeno / SCC / SCLC / Normal','var(--cyan)'],
-                ['FVC','Forced vital capacity (mL)','var(--teal)'],
                 ['95% CI','Prediction interval','var(--lavender)'],
-                ['Fibrosis Stage','Mild / Moderate / Severe','var(--coral)'],
                 ['Risk Score','AUC-ROC-based [0,1]','var(--amber)'],
                 ['Progression','7-step LSTM simulation','var(--cyan)'],
                 ['3D Mesh','Vol · Surface · HD95','var(--teal)'],

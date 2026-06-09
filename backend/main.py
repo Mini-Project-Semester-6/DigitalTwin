@@ -88,71 +88,6 @@ async def predict(
         raise HTTPException(status_code=500, detail="Inference failed.")
     
 
-@app.post("/predict/fibrosis", tags=["inference"])
-async def predict_fibrosis(
-    files: List[UploadFile] = File(...),
-    age: int = 65,
-    sex: str = "Male",
-    smoking_status: str = "Ex-smoker",
-    baseline_fvc: float = 2600.0,
-    weeks: float = 0.0,
-):
-    """
-    OSIC Pulmonary Fibrosis Digital Twin.
-    Outputs: FVC regression (mL), 95% CI, stage (mild/moderate/severe),
-             risk score, 7-step decline trajectory.
-
-    Optional metadata query params:
-      age (int, default 65)
-      sex (str: "Male" | "Female", default "Male")
-      smoking_status (str: "Never" | "Ex-smoker" | "Currently", default "Ex-smoker")
-      baseline_fvc (float mL, default 2600.0)
-      weeks (float, weeks since baseline scan, default 0.0)
-    """
-    raw_bytes = [(f.filename or "", await f.read()) for f in files]
-    try:
-        return JSONResponse(content=run_osic_fibrosis_pipeline(
-            raw_bytes, age=age, sex=sex,
-            smoking_status=smoking_status,
-            baseline_fvc=baseline_fvc,
-            weeks=weeks,
-        ))
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
-    except Exception as e:
-        logger.exception("OSIC fibrosis pipeline error: %s", e)
-        raise HTTPException(status_code=500, detail="Fibrosis inference failed.")
-    
-
-@app.post("/predict/cancer", tags=["inference"])
-async def predict_cancer(files: List[UploadFile] = File(...)):
-    """
-    Cancer type classification from CT slices.
-    Returns: cancer_type (4-class), severity, confidence, mesh, progression.
-    """
-    raw_bytes = [(f.filename or "", await f.read()) for f in files]
-    try:
-        return JSONResponse(content=run_cancer_pipeline(raw_bytes))
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
-    except Exception as e:
-        logger.exception("Cancer pipeline error: %s", e)
-        raise HTTPException(status_code=500, detail="Cancer inference failed.")
-
-
-
-@app.post("/predict/nodules", tags=["inference"])
-async def predict_nodules(files: List[UploadFile] = File(...)):
-    """
-    Nodule detection endpoint – currently disabled.
-    Always returns 503 until the model is available.
-    """
-    raise HTTPException(
-        status_code=503,
-        detail="Nodule detection is temporarily disabled.",
-    )
-
-
 @app.get("/model-info", tags=["system"])
 async def model_info():
     """Return architecture summary."""
@@ -179,6 +114,7 @@ async def model_info():
             },
         ]
     }
+
 
 @app.get("/samples", tags=["samples"])
 async def list_samples(condition: str | None = None):

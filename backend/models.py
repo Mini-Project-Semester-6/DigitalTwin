@@ -23,7 +23,7 @@ import timm
 # sev_head.0.weight:     (64, 256)   → Linear(256→64)
 # conf_head.0.weight:    (32, 256)   → Linear(256→32) + Linear(32→1)
 
-# ─── 2.5D Image Encoder (EfficientNet-B0 backbone) ─────────────────────────
+# ─── 3D Image Encoder (EfficientNet-B0 backbone) ─────────────────────────
 class ImageEncoder(nn.Module):
     def __init__(self):
         super().__init__()
